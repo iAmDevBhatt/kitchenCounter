@@ -1,38 +1,88 @@
 version: '3.8'
 
+# ── How to use ────────────────────────────────────────────────────────────────
+#  Standalone (SQLite, default):
+#    cd /opt/blr-stack/KitchenCounter
+#    docker compose up --build -d
+#
+#  Merged into /opt/blr-stack/docker-compose.yml:
+#    Copy the `services:` and `volumes:` blocks into the parent file.
+#    Make sure the shared network (blr-net) is declared in that file too.
+#    Set DATABASE_URL in backend's environment for your DB preference.
+#
+#  PostgreSQL:
+#    docker compose --profile postgres up --build -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+networks:
+  blr-net:
+    driver: bridge
+
 services:
-  db:
-    image: postgres:15
+
+  # ── Optional PostgreSQL (activate with --profile postgres) ────────────────
+  kitchencounter-db:
+    profiles: [postgres]
+    image: postgres:15-alpine
+    container_name: kitchencounter-db
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: kitchendb
-      POSTGRES_USER: kitchenuser
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB:       kitchendb
+      POSTGRES_USER:     kitchenuser
+      POSTGRES_PASSWORD: kitchenpass
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    networks:
+      - blr-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kitchenuser -d kitchendb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  backend:
-    build: 
+  # ── Backend (FastAPI + SQLite by default) ─────────────────────────────────
+  kitchencounter-backend:
+    build:
       context: .
       dockerfile: Dockerfile.backend
-    depends_on:
-      - db
+    container_name: kitchencounter-backend
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://kitchenuser:password@db:5432/kitchendb
+      # SQLite (default — no extra services needed)
+      DATABASE_URL: sqlite:////data/db/kitchendb.sqlite
+      # Uncomment for PostgreSQL (use --profile postgres):
+      # DATABASE_URL: postgresql+psycopg2://kitchenuser:kitchenpass@kitchencounter-db:5432/kitchendb
+      SECRET_KEY: change-me-in-production
     volumes:
-      - ./backend:/app
+      - uploads_data:/app/static/uploads   # item images — survives rebuilds
+      - db_data:/data/db                   # SQLite DB — survives rebuilds
+    networks:
+      - blr-net
     ports:
-      - "8000:8000"
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
-  frontend:
+  # ── Frontend (React SPA served by nginx) ──────────────────────────────────
+  kitchencounter-frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+    container_name: kitchencounter-frontend
+    restart: unless-stopped
     depends_on:
-      - backend
+      kitchencounter-backend:
+        condition: service_healthy
+    networks:
+      - blr-net
     ports:
-      - "80:80"
+      - "3080:80"    # Access at http://localhost:3080 (avoids port-80 conflicts)
 
 volumes:
   postgres_data:
+  uploads_data:    # persistent uploaded images
+  db_data:         # persistent SQLite database file

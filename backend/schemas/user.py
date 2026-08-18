@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 class UserBase(BaseModel):
     username: str
@@ -12,7 +13,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: str
     is_active: bool
-    created_at: str
-    
+    created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True

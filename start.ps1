@@ -1,23 +1,41 @@
 # Start KitchenCounter Application (Windows PowerShell)
-# This script starts both backend and frontend servers on Windows
+# Starts backend (uvicorn:8000) and frontend (Vite:5173) each in their own window.
+# Run from the project root: .\start.ps1
+# To stop: .\stop.ps1
 
-Write-Host "Starting KitchenCounter Application..."
-Write-Host ""
+$root = $PSScriptRoot
 
-# Activate virtual environment
-$venvPython = ".\backend\venv\Scripts\python.exe"
-if (-not (Test-Path $venvPython)) {
-    Write-Error "Python venv not found at $venvPython"
-    exit 1
+# --- Validate venv ---
+$venvActivate = "$root\backend\venv\Scripts\Activate.ps1"
+if (-not (Test-Path $venvActivate)) {
+    Write-Host "Python venv not found. Creating it now..." -ForegroundColor Yellow
+    python -m venv "$root\backend\venv"
+    & "$venvActivate"
+    pip install -r "$root\backend\requirements.txt" --quiet
+    Write-Host "Dependencies installed." -ForegroundColor Green
 }
 
-# Start FastAPI server in a new PowerShell window
-$bgArgs = @("-NoExit", "-Command") + @("& '$PSScriptRoot\backend\venv\Scripts\Activate.ps1' ; cd '$PSScriptRoot\backend' ; $env:PYTHONPATH='..' ; Write-Host '' ; Write-Host 'Backend running on http://127.0.0.1:8000' -ForegroundColor Green ; python -m uvicorn backend.main:app --reload --port 8000")
-$bgHandle = Start-Process powershell -ArgumentList $bgArgs -PassThru -WindowStyle Normal
+# --- Start backend in new window ---
+Write-Host "Launching backend  on http://127.0.0.1:8001 ..." -ForegroundColor Cyan
+Start-Process powershell -ArgumentList @(
+    "-NoExit", "-Command",
+    "cd '$root'; & '.\backend\venv\Scripts\Activate.ps1'; Write-Host 'Backend running on http://127.0.0.1:8001' -ForegroundColor Green; python -m uvicorn backend.main:app --reload --port 8001"
+) -WindowStyle Normal
 
-Start-Sleep -Seconds 2
+# Give uvicorn a moment to bind the port
+Start-Sleep -Seconds 3
 
-# Start React dev server
+# --- Start frontend in new window ---
+Write-Host "Launching frontend on http://localhost:5173 ..." -ForegroundColor Cyan
+Start-Process powershell -ArgumentList @(
+    "-NoExit", "-Command",
+    "cd '$root\frontend'; Write-Host 'Frontend running on http://localhost:5173' -ForegroundColor Green; npm run dev"
+) -WindowStyle Normal
+
 Write-Host ""
-Set-Location -LiteralPath "$PSScriptRoot\frontend"
-npm run dev
+Write-Host "KitchenCounter is starting up." -ForegroundColor Green
+Write-Host "  Backend : http://127.0.0.1:8001"
+Write-Host "  API docs: http://127.0.0.1:8001/docs"
+Write-Host "  Frontend: http://localhost:5173"
+Write-Host ""
+Write-Host "Run .\stop.ps1 to shut everything down."

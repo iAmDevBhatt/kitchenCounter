@@ -2,7 +2,7 @@ from __future__ import annotations
 from pydantic import BaseModel, UUID4
 from typing import Optional, List
 import uuid as stdlib_uuid
-from datetime import date as DateType, date
+from datetime import date as DateType, date, datetime
 
 
 class MealPrepBase(BaseModel):
@@ -24,7 +24,7 @@ class MealPrepUpdate(MealPrepBase):
 
 class MealPrepResponse(MealPrepBase):
     id: UUID4
-    created_at: str
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -51,7 +51,7 @@ class MealPrepEntryUpdate(MealPrepEntryBase):
 
 class MealPrepEntryResponse(MealPrepEntryBase):
     id: UUID4
-    created_at: str
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -68,7 +68,7 @@ class MealPrepItemCreate(MealPrepItemBase):
 
 class MealPrepItemResponse(MealPrepItemBase):
     id: UUID4
-    created_at: str
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -1,24 +1,35 @@
-# Stop script for KitchenCounter application
-# This script stops all running development processes
+# Stop KitchenCounter Application (Windows PowerShell)
+# Kills only the processes bound to the ports used by start.ps1:
+#   port 8001 — uvicorn / FastAPI backend
+#   port 5173 — Vite / npm run dev frontend
 
-Write-Host "Stopping KitchenCounter development servers..."
+Write-Host "Stopping KitchenCounter Application..." -ForegroundColor Yellow
+Write-Host ""
 
-# Stop backend server (uvicorn)
-$backendProcesses = Get-Process -Name uvicorn -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*backend*" }
-if ($backendProcesses) {
-    Write-Host "Stopping backend server..."
-    $backendProcesses | Stop-Process -Force
+$stopped = $false
+
+function Stop-PortProcess {
+    param([int]$Port, [string]$Label)
+    $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    if ($conn) {
+        $pid_ = ($conn | Select-Object -First 1).OwningProcess
+        $proc = Get-Process -Id $pid_ -ErrorAction SilentlyContinue
+        $name = if ($proc) { $proc.Name } else { "unknown" }
+        Write-Host "Stopping $Label (PID $pid_ — $name) on port $Port..." -ForegroundColor Cyan
+        Stop-Process -Id $pid_ -Force -ErrorAction SilentlyContinue
+        return $true
+    } else {
+        Write-Host "$Label (port $Port) is not running." -ForegroundColor Gray
+        return $false
+    }
 }
 
-# Stop frontend server (vite)
-$frontendProcesses = Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*vite*" }
-if ($frontendProcesses) {
-    Write-Host "Stopping frontend server..."
-    $frontendProcesses | Stop-Process -Force
+if (Stop-PortProcess -Port 8001 -Label "Backend ") { $stopped = $true }
+if (Stop-PortProcess -Port 5173 -Label "Frontend") { $stopped = $true }
+
+Write-Host ""
+if ($stopped) {
+    Write-Host "KitchenCounter stopped." -ForegroundColor Green
+} else {
+    Write-Host "Nothing was running." -ForegroundColor Gray
 }
-
-# Kill any remaining related processes
-Get-Process -Name "uvicorn" -ErrorAction SilentlyContinue | Stop-Process -Force
-Get-Process -Name "node" -ErrorAction SilentlyContinue | Stop-Process -Force
-
-Write-Host "KitchenCounter development servers stopped."

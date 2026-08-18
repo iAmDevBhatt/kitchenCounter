@@ -1,6 +1,6 @@
 from __future__ import annotations
-from pydantic import BaseModel, UUID4
-from typing import Optional, List, Dict
+from pydantic import BaseModel
+from typing import Optional, Dict
 
 
 class ThemeBase(BaseModel):
@@ -9,7 +9,7 @@ class ThemeBase(BaseModel):
 
 
 class ThemeCreate(ThemeBase):
-    user_id: UUID4
+    user_id: str
 
 
 class ThemeUpdate(ThemeBase):
@@ -18,10 +18,10 @@ class ThemeUpdate(ThemeBase):
 
 
 class ThemeResponse(ThemeBase):
-    id: UUID4
-    user_id: UUID4
+    id: str
+    user_id: str
     active: bool
-    created_at: str
+    created_at: Optional[str] = None
 
     class Config:
         from_attributes = True

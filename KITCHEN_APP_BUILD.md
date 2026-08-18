@@ -7,6 +7,50 @@
 
 ---
 
+## Implementation Status (last updated 2026-08-18)
+
+### ✅ Completed
+- All database models (SQLAlchemy `UUID(as_uuid=False)`), schemas (`str` UUIDs), and CRUD routers
+- JWT authentication (`/auth/login`, `/auth/register`)
+- User management API (`GET /auth/users`, `PATCH /auth/users/{id}/toggle-active`, `DELETE /auth/users/{id}`)
+- All 7 FastAPI routers wired in `main.py`; `/static` mounted for file serving
+- Inventory item image upload (`POST /inventory/upload-image/{id}`) — stored in `backend/static/uploads/`
+- Inventory item tags many-to-many (`GET/PUT /inventory/{id}/tags`) via `inventory_item_tags` table
+- Full frontend page structure: Login, Inventory, KitchenSlab, Configuration, Theme
+- InventoryTable: full CRUD, item image thumbnail + upload, tags picker (4-tab modal), stat cards, tab filters, sticky-header scrollable table
+  - Tabs: **All Items** (+ Status + expiry date range filters) → **Currently in Stock** → **Running Low** → **Out of Stock**
+  - "Out of Stock" shows both `NotInStock` and `Finished` status
+  - Usage slider auto-updates status via backend rules; status change reflects immediately in the correct tab
+- TagManager: live API CRUD (was mocked) — supports types: vitamin, mineral, allergen, diet, general
+- UserManagement: live API CRUD (was mocked) — add, toggle-active, delete; self-protection (can't delete/deactivate own account)
+- Global theme system: `ThemeContext` (`frontend/src/context/ThemeContext.jsx`) — wallpaper + palette persisted to localStorage + backend; applied across all pages via `Layout.jsx`
+- `ThemePage`: drag-drop wallpaper upload, colour palette apply, remove wallpaper
+- `labels.properties` i18n system with `useLabels` hook
+- `start.ps1` / `stop.ps1` scripts (Windows, port 8001)
+- `seed_data.py` with admin user + KitchenCategories root node
+- Tailwind CSS v3 + PostCSS; warm earthy UI (orange/amber, Inter font, card-based)
+- Docker: `docker-compose.yml` with named volumes for SQLite DB (`db_data`) and uploads (`uploads_data`); PostgreSQL opt-in via `--profile postgres`; data survives `docker compose up --build`
+
+### ⚠️ Deviations from spec / known issues
+- **Database:** SQLite used for dev AND optionally production (intentional user decision). PostgreSQL available via Docker profile. Alembic not configured — `Base.metadata.create_all()` handles schema.
+- **Backend port:** 8001 (not 8000) — port 8000 had persistent ghost TCP socket entries.
+- **MCP server:** `backend/mcp/server.py` exists but is **not mounted** in `main.py`. Needs `app.mount("/mcp", mcp_app)`.
+- **`get_db()` bug in MCP tools:** Tool functions call `get_db()` directly (generator, not session). Must use `with Session(engine) as db:`.
+- **Claude API fallback:** `backend/ai/claude_client.py` skeleton exists; LLM call not implemented. `anthropic` missing from `requirements.txt`.
+- **`/ai-insights/mcp` route:** Missing — `AIInsightsPanel` calls it but it doesn't exist in `ai_insights.py`.
+- **`AIInsightsPanel` import:** Imports `../../api/client` — should be `../../api/index.js`.
+- **No `__init__.py`:** Relative imports work because `PYTHONPATH` is set in `main.py`.
+- **PWA:** `vite-plugin-pwa` not installed.
+- **shadcn/ui + @dnd-kit:** Not installed. UI is raw Tailwind; drag-and-drop is native HTML5.
+- **Zustand store:** Not created. State is local `useState` + `ThemeContext`.
+
+### 🔜 Next phases
+- **Phase 6 (AI):** Mount MCP server; fix `get_db()` in tools; implement `messages.create()` in `claude_client.py`; add `/ai-insights/mcp` route; fix `AIInsightsPanel` import
+- **Phase 7 (PWA):** Install `vite-plugin-pwa`; configure service worker + manifest
+- **Phase 8 (Nutrition charts):** Nutrient intake pie charts by month — aggregate nutrition fields from inventory items linked to meal prep entries, grouped by tag
+
+---
+
 ## 1. Project Overview
 
 Build a **Kitchen Inventory and Meal Prep** Progressive Web App (PWA).

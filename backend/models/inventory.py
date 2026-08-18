@@ -7,8 +7,8 @@ import uuid
 class InventoryItem(Base):
     __tablename__ = "inventory_items"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
+    id = Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
+    category_id = Column(UUID(as_uuid=False), ForeignKey("categories.id"), nullable=False)
     item_name = Column(String(200), nullable=False)
     item_image_path = Column(Text)
     bought_date = Column(Date)
@@ -23,8 +23,9 @@ class InventoryItem(Base):
     sugar = Column(Numeric(10, 2))
     fat = Column(Numeric(10, 2))
     protein = Column(Numeric(10, 2))
+    stored_location_id = Column(UUID(as_uuid=False), ForeignKey("storage_locations.id"), nullable=True)
     description = Column(Text)
     notes = Column(Text)
-    created_by = Column(UUID(as_uuid=True), nullable=False)
+    created_by = Column(UUID(as_uuid=False), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

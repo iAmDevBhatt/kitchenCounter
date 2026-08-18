@@ -73,7 +73,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         data={"sub": user.username}, expires_delta=access_token_expires
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "user_id": str(user.id)}
 
 
 @router.post("/register", response_model=UserResponse)
@@ -92,3 +92,39 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+@router.get("/users", response_model=list[UserResponse])
+async def list_users(db: Session = Depends(get_db)):
+    return db.query(User).order_by(User.created_at).all()
+
+
+@router.patch("/users/{user_id}/toggle-active", response_model=UserResponse)
+async def toggle_user_active(user_id: str, db: Session = Depends(get_db)):
+    import uuid as _uuid
+    try:
+        uid = str(_uuid.UUID(user_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Invalid ID")
+    user = db.query(User).filter(User.id == uid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_active = not user.is_active
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: str, db: Session = Depends(get_db)):
+    import uuid as _uuid
+    try:
+        uid = str(_uuid.UUID(user_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="Invalid ID")
+    user = db.query(User).filter(User.id == uid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted"}

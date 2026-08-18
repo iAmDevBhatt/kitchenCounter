@@ -1,206 +1,160 @@
-import React, { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Layout from '../components/Layout/Layout'
-import useTheme from '../hooks/useTheme'
+import { useThemeContext } from '../context/ThemeContext'
 
-const ThemePage = () => {
-  const [wallpaperImage, setWallpaperImage] = useState(null)
-  const [uploading, setUploading] = useState(false)
-  const [customColors, setCustomColors] = useState({
-    primary: '#3b82f6',
-    secondary: '#10b981',
-    accent: '#f59e0b'
-  })
-  
-  const { theme, wallpaper, isLoading, uploadWallpaper, getThemeStyles } = useTheme()
+const PRESETS = [
+  { name: 'Earthy Kitchen', colors: { primary: '#ea580c', secondary: '#f59e0b', accent: '#84cc16', background: '#fff7ed' } },
+  { name: 'Ocean Breeze',   colors: { primary: '#0284c7', secondary: '#06b6d4', accent: '#6366f1', background: '#f0f9ff' } },
+  { name: 'Forest Garden',  colors: { primary: '#16a34a', secondary: '#65a30d', accent: '#ca8a04', background: '#f0fdf4' } },
+]
 
-  const handleImageUpload = (e) => {
+export default function ThemePage() {
+  const { palette, wallpaperUrl, isLoading, updatePalette, uploadWallpaper } = useThemeContext()
+  const [colors, setColors] = useState({ ...palette })
+
+  // Keep local colour pickers in sync whenever context palette changes
+  useEffect(() => { setColors({ ...palette }) }, [palette])
+
+  const handleFileChange = (e) => {
     const file = e.target.files[0]
-    if (file) {
-      setUploading(true)
-      uploadWallpaper(file)
-    }
+    if (file) uploadWallpaper(file)
   }
 
-  const handleColorChange = (colorType, value) => {
-    setCustomColors({
-      ...customColors,
-      [colorType]: value
-    })
-    
-    // Update theme in the hook if needed
-    // This would be replaced with actual API calls in real implementation
+  const handleDrop = (e) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file && file.type.startsWith('image/')) uploadWallpaper(file)
+  }
+
+  const handleColorChange = (key, val) => {
+    const next = { ...colors, [key]: val }
+    setColors(next)
+  }
+
+  const applyColors = () => {
+    updatePalette(colors)
+  }
+
+  const applyPreset = (preset) => {
+    setColors(preset.colors)
+    updatePalette(preset.colors)
+  }
+
+  const clearWallpaper = async () => {
+    localStorage.removeItem('theme_wallpaper')
+    window.location.reload()
   }
 
   return (
     <Layout>
-      <div className="p-6">
-        <h1 className="text-3xl font-bold mb-6">Theme Settings</h1>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Wallpaper Upload */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Wallpaper Upload</h2>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload New Wallpaper
-              </label>
-              
-              <div className="flex items-center justify-center w-full">
-                <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                  {uploading ? (
-                    <div className="text-gray-500">Uploading...</div>
-                  ) : wallpaperImage ? (
-                    <img src={wallpaperImage} alt="Preview" className="w-full h-full object-cover rounded-lg" />
-                  ) : (
-                    <>
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <svg className="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A41.492 41.492 0 0 0 10 9c-3.875 0-7.325-2.16-8.875-5.5A2.438 2.438 0 0 1 0 3.275v-.025C.89 3.875 2.11 4.49 3.875 4.638a43.206 43.206 0 0 0 4.21-2.137c.95-.752 2.183-1.054 3.9-1.054s3.95.302 4.897 1.054C17.114.365 18.346.71 19.107 1.976c.383.628.525 1.404.525 2.119v.025a12.4 12.4 0 0 1-7.57 9.55c-.475-.428-.599-1.384-.599-2.278s.124-1.85.599-2.278c.355-.393.666-.641 1.034-.704z"/>
-                        </svg>
-                        <p className="mb-2 text-sm text-gray-500">
-                          <span className="font-semibold">Click to upload</span> or drag and drop
-                        </p>
-                        <p className="text-xs text-gray-500">PNG, JPG, GIF (MAX. 10MB)</p>
-                      </div>
-                      <input 
-                        type="file" 
-                        className="hidden" 
-                        onChange={handleImageUpload}
-                        accept="image/*"
-                      />
-                    </>
-                  )}
-                </label>
-              </div>
-            </div>
+      <div className="mb-6">
+        <h1 className="page-title">Theme Settings</h1>
+        <p className="page-subtitle">Customise your kitchen's look and feel</p>
+      </div>
 
-            <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-              Save Wallpaper
-            </button>
-          </div>
-
-          {/* Theme Preview */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Theme Preview</h2>
-            
-            <div 
-              className="border rounded-lg p-4 h-64 flex items-center justify-center mb-4"
-              style={{
-                backgroundImage: wallpaper ? `url(${wallpaper})` : 'none',
-                backgroundSize: 'cover',
-                backgroundColor: theme.background
-              }}
-            >
-              {wallpaper ? (
-                <div className="text-white text-center">
-                  <p>Current wallaper applied</p>
-                  <p className="text-sm opacity-80">Colors extracted from image</p>
-                </div>
-              ) : (
-                <div className="text-gray-500 text-center">
-                  <p>Upload wallpaper to see live theme</p>
-                  <p className="text-sm mt-2">Current theme will be shown here</p>
-                </div>
-              )}
-            </div>
-
-            <h3 className="font-medium mb-2">Theme Colors</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Primary Color</label>
-                <input 
-                  type="color" 
-                  value={customColors.primary}
-                  onChange={(e) => handleColorChange('primary', e.target.value)}
-                  className="w-full h-10 cursor-pointer"
-                />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ── Wallpaper upload ── */}
+        <div className="card">
+          <h2 className="text-base font-semibold text-stone-800 mb-4">🖼 Wallpaper</h2>
+          <label
+            className="flex flex-col items-center justify-center w-full h-52 border-2 border-dashed border-orange-200 rounded-2xl cursor-pointer bg-orange-50 hover:bg-orange-100 transition-colors overflow-hidden relative"
+            onDrop={handleDrop}
+            onDragOver={e => e.preventDefault()}
+          >
+            {isLoading ? (
+              <div className="flex flex-col items-center gap-2 text-stone-400">
+                <svg className="animate-spin h-6 w-6 text-orange-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                <span className="text-sm">Uploading wallpaper…</span>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Secondary Color</label>
-                <input 
-                  type="color" 
-                  value={customColors.secondary}
-                  onChange={(e) => handleColorChange('secondary', e.target.value)}
-                  className="w-full h-10 cursor-pointer"
-                />
+            ) : wallpaperUrl ? (
+              <img src={wallpaperUrl} alt="Current wallpaper" className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-stone-400">
+                <span className="text-4xl">🌄</span>
+                <p className="text-sm font-medium text-stone-600">Click or drop to upload</p>
+                <p className="text-xs">PNG, JPG, WebP up to 10 MB</p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Accent Color</label>
-                <input 
-                  type="color" 
-                  value={customColors.accent}
-                  onChange={(e) => handleColorChange('accent', e.target.value)}
-                  className="w-full h-10 cursor-pointer"
-                />
-              </div>
-            </div>
-            
-            <div className="mt-4 p-3 bg-gray-50 rounded">
-              <h4 className="font-medium mb-2">Preview</h4>
-              <div className="flex space-x-2">
-                <div 
-                  className="w-10 h-10 rounded"
-                  style={{ backgroundColor: customColors.primary }}
-                ></div>
-                <div 
-                  className="w-10 h-10 rounded"
-                  style={{ backgroundColor: customColors.secondary }}
-                ></div>
-                <div 
-                  className="w-10 h-10 rounded"
-                  style={{ backgroundColor: customColors.accent }}
-                ></div>
-              </div>
-            </div>
+            )}
+            <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
+          </label>
+          <div className="flex gap-2 mt-3">
+            {wallpaperUrl && (
+              <button onClick={clearWallpaper} className="btn-danger text-xs">
+                Remove Wallpaper
+              </button>
+            )}
+            <p className="text-xs text-stone-400 flex-1 self-center">
+              {wallpaperUrl
+                ? 'Wallpaper is active on all pages.'
+                : 'No wallpaper set — flat background colour is used.'}
+            </p>
           </div>
         </div>
 
-        {/* Saved Themes */}
-        <div className="bg-white rounded-lg shadow p-6 mt-6">
-          <h2 className="text-xl font-semibold mb-4">Saved Themes</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="border rounded-lg p-4">
-              <div className="bg-gray-200 h-32 rounded mb-2"></div>
-              <p className="font-medium">Default Theme</p>
-              <button className="text-sm text-blue-600 hover:text-blue-800 mt-1">Set as Active</button>
-            </div>
-            
-            <div className="border rounded-lg p-4">
-              <div className="bg-yellow-200 h-32 rounded mb-2"></div>
-              <p className="font-medium">Summer Theme</p>
-              <button className="text-sm text-blue-600 hover:text-blue-800 mt-1">Set as Active</button>
-            </div>
-            
-            <div className="border rounded-lg p-4">
-              <div className="bg-green-200 h-32 rounded mb-2"></div>
-              <p className="font-medium">Garden Theme</p>
-              <button className="text-sm text-blue-600 hover:text-blue-800 mt-1">Set as Active</button>
-            </div>
-          </div>
-        </div>
+        {/* ── Colour pickers ── */}
+        <div className="card">
+          <h2 className="text-base font-semibold text-stone-800 mb-4">🎨 Colour Palette</h2>
 
-        {/* Color Palette Preview */}
-        <div className="bg-white rounded-lg shadow p-6 mt-6">
-          <h2 className="text-xl font-semibold mb-4">Current Theme Palette</h2>
-          
-          <div className="flex flex-wrap gap-4">
-            {Object.entries(theme).map(([key, color]) => (
-              <div key={key} className="flex items-center">
-                <div 
-                  className="w-10 h-10 rounded mr-2 border"
-                  style={{ backgroundColor: color }}
-                ></div>
-                <span className="text-sm font-mono">{key}: {color}</span>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            {Object.entries(colors).map(([key, val]) => (
+              <div key={key}>
+                <label className="label capitalize">{key}</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={val}
+                    onChange={e => handleColorChange(key, e.target.value)}
+                    className="h-10 w-14 rounded-lg border border-orange-200 cursor-pointer p-0.5"
+                  />
+                  <span className="text-xs font-mono text-stone-500">{val}</span>
+                </div>
               </div>
             ))}
           </div>
+
+          {/* Live swatch preview */}
+          <div className="flex gap-3 mb-4 p-3 bg-stone-50 rounded-xl">
+            {Object.entries(colors).map(([key, val]) => (
+              <div key={key} className="flex flex-col items-center gap-1 flex-1">
+                <div className="w-full h-10 rounded-lg shadow-sm border border-white/50" style={{ backgroundColor: val }} />
+                <span className="text-[10px] text-stone-400 capitalize">{key}</span>
+              </div>
+            ))}
+          </div>
+
+          <button onClick={applyColors} className="btn-primary w-full justify-center">
+            Apply Colours
+          </button>
+          <p className="text-xs text-stone-400 mt-2 text-center">
+            Colours apply to the background and UI accents across all pages.
+          </p>
+        </div>
+      </div>
+
+      {/* ── Presets ── */}
+      <div className="card mt-6">
+        <h2 className="text-base font-semibold text-stone-800 mb-4">✨ Theme Presets</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {PRESETS.map(p => (
+            <div key={p.name} className="border border-orange-100 rounded-2xl overflow-hidden hover:shadow-md transition-shadow">
+              <div className="h-20 flex gap-1 p-2" style={{ backgroundColor: p.colors.background }}>
+                {Object.values(p.colors).slice(0, 3).map((c, i) => (
+                  <div key={i} className="flex-1 rounded-lg" style={{ backgroundColor: c }} />
+                ))}
+              </div>
+              <div className="p-3 flex items-center justify-between">
+                <p className="text-sm font-medium text-stone-700">{p.name}</p>
+                <button onClick={() => applyPreset(p)} className="btn-secondary text-xs py-1 px-3">
+                  Apply
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </Layout>
   )
 }
-
-export default ThemePage

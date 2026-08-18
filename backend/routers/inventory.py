@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.inventory import InventoryItem
+from ..models.inventory_tag import InventoryItemTag
+from ..models.tag import Tag
 from ..schemas.inventory import InventoryItemCreate, InventoryItemResponse, InventoryItemUpdate
 from typing import List
 import os
@@ -12,9 +14,9 @@ from pathlib import Path
 router = APIRouter()
 
 
-def _parse_uid(s: str) -> stdlib_uuid.UUID:
+def _parse_uid(s: str) -> str:
     try:
-        return stdlib_uuid.UUID(s)
+        return str(stdlib_uuid.UUID(s))  # validates format, returns canonical string
     except (ValueError, TypeError):
         raise HTTPException(status_code=404, detail="Invalid ID")
 
@@ -59,14 +61,15 @@ async def update_inventory_item(item_id: str, item_update: InventoryItemUpdate, 
     if not db_item:
         raise HTTPException(status_code=404, detail="Inventory item not found")
 
-    # Auto-update status from usage_percentage (business rule)
-    if item_update.usage_percentage is not None:
-        if item_update.usage_percentage == 100:
-            item_update.status = "Finished"
-        elif 1 <= item_update.usage_percentage <= 99:
-            item_update.status = "InUse"
-
     update_data = item_update.model_dump(exclude_unset=True)
+
+    # Auto-set status from usage_percentage only when caller did not explicitly set status
+    if 'usage_percentage' in update_data and 'status' not in update_data:
+        pct = update_data['usage_percentage']
+        if pct == 100:
+            update_data['status'] = 'Finished'
+        elif 1 <= pct <= 99:
+            update_data['status'] = 'InUse'
     for key, value in update_data.items():
         setattr(db_item, key, value)
 
@@ -85,6 +88,30 @@ async def delete_inventory_item(item_id: str, db: Session = Depends(get_db)):
     db.delete(db_item)
     db.commit()
     return {"message": "Inventory item deleted successfully"}
+
+
+@router.get("/{item_id}/tags")
+async def get_item_tags(item_id: str, db: Session = Depends(get_db)):
+    uid = _parse_uid(item_id)
+    rows = db.query(InventoryItemTag).filter(InventoryItemTag.item_id == uid).all()
+    tag_ids = [r.tag_id for r in rows]
+    if not tag_ids:
+        return []
+    tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+    return [{"id": t.id, "name": t.name, "tag_type": t.tag_type} for t in tags]
+
+
+@router.put("/{item_id}/tags")
+async def set_item_tags(item_id: str, payload: dict, db: Session = Depends(get_db)):
+    uid = _parse_uid(item_id)
+    tag_ids = payload.get("tag_ids", [])
+    # Delete existing
+    db.query(InventoryItemTag).filter(InventoryItemTag.item_id == uid).delete()
+    # Insert new
+    for tid in tag_ids:
+        db.add(InventoryItemTag(item_id=uid, tag_id=str(stdlib_uuid.UUID(tid))))
+    db.commit()
+    return {"tag_ids": tag_ids}
 
 
 @router.post("/upload-image/{item_id}")

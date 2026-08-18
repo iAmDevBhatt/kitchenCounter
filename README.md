@@ -1,177 +1,142 @@
 # KitchenCounter - AI-Powered Kitchen Inventory & Meal Prep App
 
-KitchenCounter is a Progressive Web App (PWA) for managing kitchen inventory and meal preparation plans. It helps you track what's in your fridge, manage expiration dates, plan your meals, and get AI-powered insights.
+KitchenCounter is a Progressive Web App (PWA) for managing kitchen inventory and meal preparation plans. It helps you track what's in your fridge, manage expiration dates, plan meals, and get AI-powered insights.
 
 ## Features
-- **Kitchen Inventory Management**: Track ingredients with quantity, expiration dates, and nutritional information
-- **Meal Planning**: Create and manage monthly meal prep plans 
-- **Dynamic Theming**: Personalized UI based on uploaded wallpapers
-- **AI Insights**: Leverage AI to get insights from your kitchen data via MCP server or Claude API
-- **PWA Support**: Installable application with offline capabilities
+
+- **Kitchen Inventory Management** — Track items with images, quantity, expiry dates, nutritional info, and tags
+- **Item Image Uploads** — Add a photo to each inventory item; thumbnails displayed in all tables
+- **Tag System** — Attach tags (vitamin, mineral, allergen, diet, general) to items for future nutrient analysis
+- **Meal Planning** — Create and manage monthly meal prep plans
+- **Dynamic Theming** — Upload a wallpaper; palette applies as background across all pages
+- **User Management** — Add, deactivate, and delete users from the Configuration page
+- **AI Insights** — Skeleton wired; Claude API fallback ready (LLM call not yet implemented)
+- **Docker-first** — SQLite by default; PostgreSQL opt-in; all uploaded data persists across redeployments
 
 ## Tech Stack
 
 ### Backend
-- Python 3.11+
-- FastAPI (Python web framework)
-- PostgreSQL 15+
-- SQLAlchemy 2.x (async ORM)
-- Alembic (database migrations)
+- Python 3.11+ / FastAPI
+- SQLite (dev + optional production) / PostgreSQL 15+ (production option)
+- SQLAlchemy 2.x sync ORM — `Base.metadata.create_all()` on startup (no Alembic yet)
+- JWT auth via `python-jose` + bcrypt
 
 ### Frontend
 - React 18 + Vite 5
-- shadcn/ui + Tailwind CSS
-- PWA support with vite-plugin-pwa
+- Tailwind CSS v3 — warm earthy orange/amber palette, Inter font
+- React Context for global theme state
+- Axios with `/api` prefix → Vite proxy → backend
 
-### AI Integration
-- FastAPI-MCP server for database tool access
-- Anthropic SDK (Claude Sonnet 5 model) as fallback
+### AI Integration (partial)
+- FastAPI-MCP server stub (`backend/mcp/server.py`) — not yet mounted
+- Anthropic SDK skeleton (`backend/ai/claude_client.py`) — LLM call not yet implemented
 
-## Project Structure
+## Quick Start (Windows)
 
-```
-KitchenCounter/
-├── backend/                    # Python FastAPI application
-│   ├── main.py                 # FastAPI app entry point
-│   ├── config.py               # App settings (pydantic-settings)
-│   ├── database.py             # Async SQLAlchemy engine + session
-│   ├── models/                 # Database models 
-│   │   ├── user.py
-│   │   ├── category.py
-│   │   ├── inventory.py
-│   │   ├── meal_prep.py
-│   │   └── tag.py
-│   ├── schemas/                # Pydantic validation models
-│   │   ├── user.py
-│   │   ├── category.py
-│   │   ├── inventory.py
-│   │   ├── meal_prep.py
-│   │   └── tag.py
-│   ├── routers/                # API routes
-│   │   ├── auth.py
-│   │   ├── categories.py
-│   │   ├── inventory.py
-│   │   ├── meal_prep.py
-│   │   ├── tags.py
-│   │   ├── theme.py
-│   │   └── ai_insights.py
-│   ├── mcp/                    # MCP server implementation
-│   │   ├── server.py
-│   │   └── tools.py
-│   ├── ai/                     # AI integration (Anthropic Claude)
-│   │   └── claude_client.py
-│   ├── migrations/             # Alembic migration files
-│   ├── static/                 # Static files and uploads
-│   │   └── uploads/
-│   └── requirements.txt        # Python dependencies
-├── frontend/                   # React frontend
-│   ├── public/                 # Public assets (manifest.json, icons)
-│   │   ├── manifest.json
-│   │   └── icons/
-│   ├── src/
-│   │   ├── main.jsx            # App entry point
-│   │   ├── App.jsx             # Main App component
-│   │   ├── assets/             # UI labels, images, etc.
-│   │   │   ├── labels.properties  # All UI label strings
-│   │   │   └── icons/
-│   │   ├── hooks/              # Custom React hooks
-│   │   │   ├── useLabels.js    # Parses labels.properties at runtime
-│   │   │   └── useTheme.js     # Dynamic theme from wallpaper image
-│   │   ├── components/         # Reusable UI Components
-│   │   │   ├── Layout/
-│   │   │   ├── CategoryTree/
-│   │   │   ├── InventoryTable/
-│   │   │   ├── MealPrepGrid/
-│   │   │   ├── DragDropItems/
-│   │   │   └── AIInsightsPanel/
-│   │   ├── pages/              # Page components
-│   │   │   ├── LoginPage.jsx
-│   │   │   ├── InventoryPage.jsx
-│   │   │   ├── KitchenSlabPage.jsx
-│   │   │   ├── ConfigurationPage.jsx
-│   │   │   └── ThemePage.jsx
-│   │   ├── api/                # Axios API clients per resource
-│   │   └── store/              # Zustand global state
-│   ├── vite.config.js
-│   └── package.json
-├── docker-compose.yml          # Docker deployment configuration
-├── Dockerfile.backend          # Backend Dockerfile
-├── Dockerfile.frontend         # Frontend Dockerfile
-├── start.sh                    # Start script (Linux/Mac)
-├── start.ps1                   # Start script (Windows PowerShell)
-├── init.sh                     # Init script (cross-platform)
-├── KITCHEN_APP_BUILD.md        # Complete build specification (AI reference)
-└── CLAUDE.md                   # AI developer reference
+```powershell
+# From project root:
+.\start.ps1     # starts backend on :8001 and frontend on :5173
+.\stop.ps1      # stops both
 ```
 
-## Prerequisites
+Default login: `admin` / `admin123`
 
-- Python 3.11+
-- Node.js 18+ 
-- PostgreSQL 15+
+- Frontend: http://localhost:5173
+- API docs: http://127.0.0.1:8001/docs
 
-## Quick Start
+## Quick Start (Linux/Mac)
 
-### 1. Initialize the project:
 ```bash
-./init.sh
-```
-
-### 2. Start the application:
-```bash
-# Linux/Mac:
+./init.sh       # create venv, install deps, seed database
 ./start.sh
-
-# Windows:
-./start.ps1
 ```
 
 ## Environment Variables
 
-Create a `.env` file based on `.env.example`:
+Create `.env` in the project root:
+
 ```
-DATABASE_URL=postgresql+asyncpg://kitchenuser:password@localhost:5432/kitchendb
+DATABASE_URL=sqlite:///./kitchendb.sqlite
 SECRET_KEY=changeme
 ACCESS_TOKEN_EXPIRE_MINUTES=480
 UPLOAD_DIR=backend/static/uploads
 ANTHROPIC_API_KEY=your_key_here
 MCP_ENABLED=true
-CORS_ORIGINS=http://localhost:5173
+CORS_ORIGINS=*
 ```
 
-## Database Schema
+## Docker Deployment
 
-See `CLAUDE.md` for detailed database schema information.
+```bash
+# SQLite (default — no Postgres container started):
+docker compose up --build
 
-## Deployment
+# PostgreSQL:
+docker compose --profile postgres up --build
+```
 
-The application supports both standalone development and Docker deployment. 
+### Data persistence
 
-### Standalone Development:
-- Run `./init.sh` to setup project dependencies and database
-- Run `./start.sh` (Linux/Mac) or `./start.ps1` (Windows)
+All data survives `docker compose up --build` via named volumes:
 
-### Docker Deployment:
-- Build images with `docker-compose build`
-- Start containers with `docker-compose up`
+| Volume | Contains |
+|---|---|
+| `uploads_data` | Uploaded images (item photos + wallpapers) |
+| `db_data` | SQLite database file |
+| `postgres_data` | PostgreSQL data (only with `--profile postgres`) |
+
+> **Never run `docker compose down -v`** in production — it deletes all volumes.
+
+## Project Structure
+
+```
+KitchenCounter/
+├── backend/
+│   ├── main.py                 # FastAPI entry point; mounts /static
+│   ├── config.py               # pydantic-settings
+│   ├── database.py             # Sync SQLAlchemy, SQLite WAL mode
+│   ├── models/                 # SQLAlchemy models (UUID as_uuid=False)
+│   ├── schemas/                # Pydantic schemas (UUID fields as str)
+│   ├── routers/                # auth, categories, inventory, meal_prep, tags, theme, ai_insights
+│   ├── mcp/                    # MCP server stub (not mounted)
+│   ├── ai/                     # Claude API client skeleton
+│   ├── static/uploads/         # Uploaded files (Docker: named volume)
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── context/ThemeContext.jsx   # Global wallpaper + palette state
+│   │   ├── components/
+│   │   │   ├── InventoryTable/        # Full CRUD, images, tags
+│   │   │   ├── TagManager/            # Full CRUD (live API)
+│   │   │   └── UserManagement/        # Full CRUD (live API)
+│   │   ├── pages/
+│   │   └── api/index.js               # Axios, baseURL: '/api'
+│   └── vite.config.js                 # Proxy /api + /static → :8001
+├── docker-compose.yml
+├── Dockerfile.backend
+├── Dockerfile.frontend
+├── start.ps1 / stop.ps1        # Windows dev scripts
+├── start.sh / init.sh          # Linux/Mac dev scripts
+├── CLAUDE.md                   # Full technical reference for AI developers
+└── KITCHEN_APP_BUILD.md        # Original build specification
+```
 
 ## Troubleshooting
 
-1. **Database connection issues**:
-   - Ensure PostgreSQL is running
-   - Create database: `createdb kitchendb`
-   - Create user and grant permissions  
+**Backend won't start on port 8001**
+- Check for a lingering process: `netstat -ano | findstr :8001` (Windows)
+- Kill it or change the port in `start.ps1` and `vite.config.js`
 
-2. **Frontend not starting**:
-   - Run `npm install` in `frontend/` directory
-   - Check that Node.js version is 18+
+**Categories / tags not loading (500 error)**
+- Most likely a stale DB file from a different machine. Delete `backend/kitchendb.sqlite` and restart — the app recreates the schema automatically. Re-seed with `python backend/seed_data.py`.
 
-3. **Backend issues**:
-   - Activate virtual environment: `source backend/venv/bin/activate`
-   - Ensure all Python dependencies are installed
+**Images not showing**
+- The Vite proxy forwards `/static` to `:8001`. Ensure the backend is running.
+- In Docker, confirm the `uploads_data` volume is mounted: `docker volume ls`
+
+**Tags picker shows no tags**
+- Tags must be created first in Configuration → Tag Management. The picker fetches live from the API.
 
 ## Development Notes
 
-This application follows a phased development approach as outlined in `KITCHEN_APP_BUILD.md`. The phases progress from basic setup to advanced features like AI integration and PWA capabilities.
-
-AI developers, please update `CLAUDE.md` and `README.md` at the end of each development phase.
+See `CLAUDE.md` for the full technical reference including schema details, API route table, UUID rules, and next-phase roadmap.

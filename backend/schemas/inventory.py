@@ -2,7 +2,7 @@ from __future__ import annotations
 from pydantic import BaseModel, UUID4
 from typing import Optional, List, Union
 from decimal import Decimal
-from datetime import date as DateType
+from datetime import date as DateType, datetime
 import uuid
 
 
@@ -22,6 +22,7 @@ class InventoryItemBase(BaseModel):
     sugar: Optional[Decimal] = None
     fat: Optional[Decimal] = None
     protein: Optional[Decimal] = None
+    stored_location_id: Optional[str] = None
     description: Optional[str] = None
     notes: Optional[str] = None
     created_by: str
@@ -46,14 +47,16 @@ class InventoryItemUpdate(InventoryItemBase):
     sugar: Optional[Decimal] = None
     fat: Optional[Decimal] = None
     protein: Optional[Decimal] = None
+    stored_location_id: Optional[str] = None
     description: Optional[str] = None
     notes: Optional[str] = None
+    created_by: Optional[str] = None
 
 
 class InventoryItemResponse(InventoryItemBase):
-    id: UUID4
-    created_at: str
-    updated_at: str
+    id: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -10,6 +10,7 @@ const useLabels = () => {
   useEffect(() => {
     // This would be replaced with actual API call in real implementation
     const mockLabels = {
+      'nav.diet-stats': 'Diet & Stats',
       'nav.inventory': 'Inventory',
       'nav.kitchen-slab': 'Kitchen Slab',
       'nav.configuration': 'Configuration',

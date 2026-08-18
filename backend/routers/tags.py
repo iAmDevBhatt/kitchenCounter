@@ -9,9 +9,9 @@ import uuid as stdlib_uuid
 router = APIRouter()
 
 
-def _parse_uid(s: str) -> stdlib_uuid.UUID:
+def _parse_uid(s: str) -> str:
     try:
-        return stdlib_uuid.UUID(s)
+        return str(stdlib_uuid.UUID(s))
     except (ValueError, TypeError):
         raise HTTPException(status_code=404, detail="Invalid ID")
 

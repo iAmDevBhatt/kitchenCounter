@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pydantic import BaseModel, UUID4
 from typing import Optional
+from datetime import datetime
 
 
 class CategoryBase(BaseModel):
@@ -22,7 +23,7 @@ class CategoryUpdate(CategoryBase):
 
 class CategoryResponse(CategoryBase):
     id: UUID4
-    created_at: str
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

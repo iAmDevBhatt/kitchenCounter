@@ -1,19 +1,38 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.theme import ThemeSettings
 from ..schemas.theme import ThemeCreate, ThemeResponse, ThemeUpdate
 import uuid as stdlib_uuid
+import shutil
+import os
+from pathlib import Path
 
 router = APIRouter()
 
+UPLOAD_DIR = Path(__file__).resolve().parent.parent / "static" / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-def _parse_uid(s: str) -> stdlib_uuid.UUID:
+
+def _parse_uid(s: str) -> str:
     try:
-        return stdlib_uuid.UUID(s)
+        return str(stdlib_uuid.UUID(s))
     except (ValueError, TypeError):
         raise HTTPException(status_code=404, detail="Invalid ID")
+
+
+@router.post("/upload-wallpaper")
+async def upload_wallpaper(file: UploadFile = File(...)):
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {'.jpg', '.jpeg', '.png', '.webp', '.gif'}:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+    filename = f"{stdlib_uuid.uuid4()}{ext}"
+    dest = UPLOAD_DIR / filename
+    with dest.open("wb") as buf:
+        shutil.copyfileobj(file.file, buf)
+    return {"url": f"/static/uploads/{filename}"}
 
 
 @router.get("/user/{user_id}", response_model=ThemeResponse | None)
