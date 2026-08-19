@@ -5,7 +5,7 @@ import useLabels from '../hooks/useLabels'
 
 const TABS = [
   { key: 'all',     label: 'All Items',           filter: null, showAllFilters: true,  icon: '🗂️', color: 'text-stone-600' },
-  { key: 'current', label: 'tab.current.stock',  filter: null,                        icon: '📦', color: 'text-emerald-600' },
+  { key: 'current', label: 'tab.current.stock',  filter: ['Stocked', 'InUse'],        icon: '📦', color: 'text-emerald-600' },
   { key: 'low',     label: 'tab.running.low',     filter: 'InUse',                    icon: '⚠️', color: 'text-amber-600' },
   { key: 'out',     label: 'tab.out.of.stock',    filter: ['NotInStock', 'Finished'], icon: '🚫', color: 'text-red-500' },
 ]

@@ -1,6 +1,6 @@
 # KitchenCounter - AI Developer Reference
 
-> Last updated: 2026-08-18 (session 3). See `KITCHEN_APP_BUILD.md` §Implementation Status for full gap list.
+> Last updated: 2026-08-19 (session 4). See `KITCHEN_APP_BUILD.md` §Implementation Status for full gap list.
 
 This document provides comprehensive technical documentation for developers working on the KitchenCounter application.
 
@@ -36,8 +36,9 @@ KitchenCounter is a Progressive Web App (PWA) with:
 | Routing | react-router-dom v7 |
 | HTTP | Axios (`frontend/src/api/index.js`) with `baseURL: '/api'` |
 | State | Local `useState`/`useEffect` + React Context (`ThemeContext`) for global theme |
-| Drag & drop | Native HTML5 API (no @dnd-kit) |
+| Drag & drop | Mouse-event system (NO HTML5 drag API) — `onMouseDown` + document-level `mousemove`/`mouseup`, 4px threshold, refs avoid stale closures |
 | Charts | Recharts 3.x (`recharts`, `react-is` peer dep) — used by DietStatsPage |
+| Bulk import/export | `xlsx` (SheetJS) + `papaparse` — installed in `frontend/` |
 | PWA | Not yet configured (`vite-plugin-pwa` not installed) |
 
 ## Vite Proxy Configuration
@@ -116,7 +117,7 @@ KitchenCounter/
 │   │   ├── components/
 │   │   │   ├── Layout/         # Nav + wallpaper background, consumes ThemeContext
 │   │   │   ├── CategoryTree/   # Live API, full CRUD
-│   │   │   ├── InventoryTable/ # Live API, full CRUD + image upload + tags
+│   │   │   ├── InventoryTable/ # Live API, full CRUD + image upload + tags + CategoryPicker + BulkImportExport
 │   │   │   ├── TagManager/     # Live API, full CRUD (was mocked, now real)
 │   │   │   ├── UserManagement/ # Live API, full CRUD (was mocked, now real)
 │   │   │   ├── MealPrepGrid/
@@ -124,8 +125,9 @@ KitchenCounter/
 │   │   │   └── AIInsightsPanel/
 │   │   ├── pages/
 │   │   │   ├── LoginPage.jsx
-│   │   │   ├── InventoryPage.jsx   # Tabs: All Items → In Stock → Running Low → Out of Stock
-│   │   │   ├── KitchenSlabPage.jsx
+│   │   │   ├── InventoryPage.jsx      # Tabs: All Items → In Stock (Stocked+InUse) → Running Low → Out of Stock
+│   │   │   ├── KitchenSlabPage.jsx    # Real inventory data; 4 filters; pointer-based drag to meal prep modal
+│   │   │   ├── DietStatsPage.jsx      # Dietary stats + usage trend charts (3 chart components, fixed year picker)
 │   │   │   ├── ConfigurationPage.jsx  # Tabs: Categories | Tags | Users
 │   │   │   └── ThemePage.jsx         # Wallpaper upload + palette apply
 │   │   └── api/
@@ -294,6 +296,7 @@ Data for a month is NOT created until the user explicitly creates it.
 | `DELETE` | `/storage-locations/{id}` | Delete storage location |
 | `GET` | `/stats/dietary/{year}/{month}` | Dietary tag stats + nutrition totals for a month |
 | `GET` | `/stats/inventory-overview` | Inventory health snapshot (status, expiry, top categories) |
+| `GET` | `/stats/usage-trend` | Rolling 6-month item usage trend — designed for AI/MCP tool calling (no params) |
 
 ## Key Business Rules
 
@@ -316,6 +319,69 @@ Theme state is managed by `ThemeContext` (`frontend/src/context/ThemeContext.jsx
 - Loads saved theme from `GET /api/theme/user/{userId}` on app mount
 - `Layout.jsx` consumes the context and applies wallpaper as `backgroundImage` with fixed attachment
 - `useTheme.js` re-exports `useThemeContext` for backwards compatibility
+
+## CategoryPicker Component
+
+`frontend/src/components/InventoryTable/InventoryTable.jsx` contains an inline `CategoryPicker` component replacing the native `<select>` for category choice in the item modal:
+- Renders a floating dropdown with a search input
+- Displays each category as a breadcrumb path (e.g. `KitchenCategories > Dairy > Cheese`)
+- Depth indicators (filled dots) show nesting level at a glance
+- Checkmark on currently selected item
+- Closes on outside click via `useEffect`
+
+## Bulk Import / Export
+
+`frontend/src/components/InventoryTable/BulkImportExport.jsx` — standalone component rendered in the InventoryTable toolbar:
+
+**Export:** downloads current inventory as `.xlsx` or `.csv`. Category/location/tag UUIDs are resolved to human-readable names. Columns (16): Item Name, Category, Stored Location, Quantity, Status, Bought Date, Expiry Date, Net Weight, Amount, Sugar, Fiber, Carbohydrate, Fat, Protein, Tags, Notes.
+
+**Import:** accepts `.xlsx` / `.csv` (same column headers). Per row:
+1. Resolves category by name — auto-creates under root via `POST /categories/` if not found
+2. Resolves storage location by name — auto-creates via `POST /storage-locations/` if not found
+3. Resolves each tag name — auto-creates via `POST /tags/` with `tag_type: 'general'` if not found
+4. `POST /inventory/` → `PUT /inventory/{id}/tags`
+5. Shows progress modal (row counter, succeeded/failed counts, per-row error list)
+
+**npm install note (corporate env):** `npm config set strict-ssl false` before install; reset to `true` after.
+
+## Kitchen Slab — Drag-and-Drop Architecture
+
+HTML5 drag API is broken inside `overflow: auto/scroll` ancestors (Chrome/Safari — `dataTransfer.getData()` returns empty string). The drag system uses mouse events instead:
+
+- `onMouseDown` on inventory row items sets `pendingRef` (no `preventDefault`, preserving clicks)
+- Single `useEffect([], [])` adds document-level `mousemove` / `mouseup` listeners; refs (`draggingRef`, `activeRef`) provide stale-closure-free access to state
+- `mousemove` activates drag after 4px threshold; updates floating ghost position; hides ghost → `elementFromPoint` → find `[data-dropzone]` ancestor → set `activeOver`
+- `mouseup` reads refs, commits item to the targeted meal slot, resets all state
+- Drop targets: `<div data-dropzone={mealName}>` — highlights when `activeOver === mealName`
+- Floating ghost: `position: fixed; z-index: 100; pointer-events: none`
+
+## Usage Trend Endpoint (AI/MCP)
+
+`GET /stats/usage-trend` — no parameters required; designed for direct AI/MCP tool calling.
+
+Returns:
+```json
+{
+  "months": [{"label": "Feb 2026", "year": 2026, "month": 2}, ...],   // 6 entries, oldest first
+  "top_items": [{"id": "...", "name": "...", "monthly_counts": [0,2,1,0,3,1], "total": 7}, ...],
+  "category_totals": [{"category_id": "...", "name": "...", "count": 12}, ...],
+  "monthly_totals": [{"label": "Feb 2026", "total_items": 5}, ...]
+}
+```
+
+`monthly_counts` is a list aligned positionally to `months` — index 0 = oldest month.
+
+## Diet & Stats Page — Usage Trend Charts
+
+Three new chart components in `DietStatsPage.jsx`:
+
+| Component | Chart type | Data used |
+|---|---|---|
+| `UsageTrendChart` | Stacked `BarChart` | `top_items` × months; each item is a `<Bar stackId="a">` |
+| `CategoryUsagePie` | Donut `PieChart` (`innerRadius=50, outerRadius=110`) | `category_totals` top 10; labels hidden for slices < 4% |
+| `MonthlyVolumeLine` | `LineChart` 160px tall | `monthly_totals` `total_items` |
+
+Also fixed: `YEARS` array now covers `now.getFullYear() - 10` through present (was incorrectly listing only future years).
 
 ## Inventory Item Image Flow
 

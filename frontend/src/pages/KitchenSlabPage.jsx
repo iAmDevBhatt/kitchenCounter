@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Layout from '../components/Layout/Layout'
 import useLabels from '../hooks/useLabels'
+import apiClient from '../api/index.js'
 
 // ── constants ────────────────────────────────────────────────────────────────
 const MEALS = ['Breakfast', 'Lunch', 'Dinner']
@@ -17,18 +18,6 @@ const INV_STATUS_BADGE = {
   InUse: 'badge-orange', Stocked: 'badge-green',
   Finished: 'badge-stone', NotInStock: 'badge-red',
 }
-
-// ── mock inventory items (replace with API later) ────────────────────────────
-const MOCK_INVENTORY = [
-  { id:'i1', name:'Apples',        cat:'Fruits',      status:'InUse',   qty:5 },
-  { id:'i2', name:'Milk',          cat:'Dairy',       status:'Stocked', qty:1 },
-  { id:'i3', name:'Chicken Breast',cat:'Meat',        status:'InUse',   qty:2 },
-  { id:'i4', name:'Rice',          cat:'Grains',      status:'Stocked', qty:3 },
-  { id:'i5', name:'Broccoli',      cat:'Vegetables',  status:'InUse',   qty:4 },
-  { id:'i6', name:'Salmon',        cat:'Meat',        status:'Stocked', qty:2 },
-  { id:'i7', name:'Yogurt',        cat:'Dairy',       status:'InUse',   qty:2 },
-  { id:'i8', name:'Bread',         cat:'Grains',      status:'InUse',   qty:1 },
-]
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function emptyMeal() {
@@ -66,21 +55,10 @@ function MealCell({ meal, onEdit }) {
 }
 
 // ── MealDropZone (inside modal) ───────────────────────────────────────────────
-function MealDropZone({ mealName, meal, onChange, draggingItem }) {
-  const [over, setOver] = useState(false)
-
-  const onDragOver = (e) => { e.preventDefault(); setOver(true) }
-  const onDragLeave = () => setOver(false)
-  const onDrop = (e) => {
-    e.preventDefault()
-    setOver(false)
-    try {
-      const item = JSON.parse(e.dataTransfer.getData('inv-item'))
-      if (meal.items.find(i => i.id === item.id)) return // already added
-      onChange({ ...meal, items: [...meal.items, item] })
-    } catch {}
-  }
+// Uses a data attribute so pointer-based hit-testing can find it
+function MealDropZone({ mealName, meal, onChange, activeOver }) {
   const removeItem = (id) => onChange({ ...meal, items: meal.items.filter(i => i.id !== id) })
+  const over = activeOver === mealName
 
   return (
     <div className="border border-orange-100 rounded-xl p-3">
@@ -111,22 +89,20 @@ function MealDropZone({ mealName, meal, onChange, draggingItem }) {
         onChange={e => onChange({ ...meal, notes: e.target.value })}
       />
 
-      {/* drop target */}
+      {/* drop target — data-dropzone used for hit-testing */}
       <div
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
+        data-dropzone={mealName}
         className={`min-h-12 rounded-lg border-2 border-dashed transition-all p-2 flex flex-wrap gap-1.5 items-start
           ${over ? 'border-orange-500 bg-orange-50' : 'border-orange-200 bg-orange-50/30'}`}
       >
         {meal.items.length === 0 && (
           <span className="text-xs text-stone-400 w-full text-center py-1">
-            {over ? '✅ Drop to add' : '⬅ Drag inventory items here'}
+            {over ? '✅ Drop to add' : 'Drop inventory items here'}
           </span>
         )}
         {meal.items.map(it => (
           <span key={it.id}
-            className="inline-flex items-center gap-1 text-xs bg-white border border-orange-200 rounded-full px-2 py-0.5 text-orange-700 shadow-sm">
+            className="inline-flex items-center gap-1 text-xs bg-white border border-orange-200 rounded-full px-2 py-0.5 text-orange-700 shadow-sm pointer-events-auto">
             {it.name}
             <button onClick={() => removeItem(it.id)} className="text-stone-400 hover:text-red-500 leading-none">×</button>
           </span>
@@ -137,18 +113,92 @@ function MealDropZone({ mealName, meal, onChange, draggingItem }) {
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
-function MealPrepModal({ row, onSave, onClose }) {
-  const [day, setDay]           = useState(row ? row.day : '')
-  const [meals, setMeals]       = useState(
+function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
+  const [day, setDay]     = useState(row ? row.day : '')
+  const [meals, setMeals] = useState(
     row
       ? { Breakfast: { ...row.Breakfast }, Lunch: { ...row.Lunch }, Dinner: { ...row.Dinner } }
       : { Breakfast: emptyMeal(), Lunch: emptyMeal(), Dinner: emptyMeal() }
   )
   const [invFilter, setInvFilter] = useState('All')
-  const [draggingItem, setDraggingItem] = useState(null)
 
-  const cats = ['All', ...new Set(MOCK_INVENTORY.map(i => i.cat))]
-  const visibleInv = MOCK_INVENTORY.filter(i => invFilter === 'All' || i.cat === invFilter)
+  // ── Pointer-based drag state ──────────────────────────────────────────────
+  const [dragging,   setDragging]   = useState(null)  // { item, x, y } — set after threshold
+  const [activeOver, setActiveOver] = useState(null)  // meal name under cursor
+  const ghostRef    = useRef()
+  const pendingRef  = useRef(null)   // { item, startX, startY } before threshold
+  const draggingRef = useRef(null)   // mirrors dragging state for use inside listeners
+  const activeRef   = useRef(null)   // mirrors activeOver for use inside listeners
+
+  draggingRef.current = dragging
+  activeRef.current   = activeOver
+
+  const cats = ['All', ...new Set(inventory.map(i => catMap[i.category_id] || 'Unknown'))]
+  const visibleInv = inventory.filter(i =>
+    invFilter === 'All' || (catMap[i.category_id] || 'Unknown') === invFilter
+  )
+
+  // Document-level listeners — mounted once, read state via refs
+  useEffect(() => {
+    const onMove = (e) => {
+      const cx = e.clientX
+      const cy = e.clientY
+      if (!pendingRef.current && !draggingRef.current) return
+
+      // Activate drag once cursor moves > 4px from mousedown point
+      if (pendingRef.current && !draggingRef.current) {
+        const dx = cx - pendingRef.current.startX
+        const dy = cy - pendingRef.current.startY
+        if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return
+        const newDrag = { item: pendingRef.current.item, x: cx, y: cy }
+        draggingRef.current = newDrag
+        setDragging(newDrag)
+        return
+      }
+
+      // Update ghost position
+      setDragging(d => d ? { ...d, x: cx, y: cy } : d)
+
+      // Hit-test drop zones
+      if (ghostRef.current) ghostRef.current.style.display = 'none'
+      const el = document.elementFromPoint(cx, cy)
+      if (ghostRef.current) ghostRef.current.style.display = ''
+      const zone = el?.closest('[data-dropzone]')
+      const zoneName = zone ? zone.dataset.dropzone : null
+      activeRef.current = zoneName
+      setActiveOver(zoneName)
+    }
+
+    const onUp = () => {
+      const d = draggingRef.current
+      const a = activeRef.current
+      if (d && a) {
+        setMeals(prev => {
+          const meal = prev[a]
+          if (meal.items.find(i => i.id === d.item.id)) return prev
+          return { ...prev, [a]: { ...meal, items: [...meal.items, d.item] } }
+        })
+      }
+      pendingRef.current  = null
+      draggingRef.current = null
+      activeRef.current   = null
+      setDragging(null)
+      setActiveOver(null)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup',   onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup',   onUp)
+    }
+  }, [])  // mount once — reads state via refs, never stale
+
+  const onItemMouseDown = (e, item) => {
+    if (e.button !== 0) return  // left button only
+    pendingRef.current = { item, startX: e.clientX, startY: e.clientY }
+    // No preventDefault — clicks, inputs, selects all work normally
+  }
 
   const handleSave = () => {
     if (!day || isNaN(parseInt(day)) || parseInt(day) < 1 || parseInt(day) > 31) {
@@ -174,47 +224,45 @@ function MealPrepModal({ row, onSave, onClose }) {
         </div>
 
         {/* body */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* left: inventory panel */}
-          <div className="w-56 shrink-0 border-r border-orange-100 p-4 flex flex-col gap-3 overflow-y-auto">
+        <div className="flex flex-1 min-h-0">
+          {/* LEFT: inventory list */}
+          <div className="w-60 shrink-0 border-r border-orange-100 p-4 flex flex-col gap-3 overflow-y-auto">
             <div>
-              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Inventory</p>
-              <p className="text-xs text-stone-400 mb-3">Drag items into a meal slot →</p>
-              <select
-                className="input text-xs py-1 mb-2"
-                value={invFilter}
-                onChange={e => setInvFilter(e.target.value)}
-              >
+              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">Inventory</p>
+              <p className="text-xs text-stone-400 mb-2">Drag items into a meal →</p>
+              <select className="input text-xs py-1" value={invFilter} onChange={e => setInvFilter(e.target.value)}>
                 {cats.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              {visibleInv.map(item => (
-                <div
-                  key={item.id}
-                  draggable
-                  onDragStart={e => {
-                    e.dataTransfer.setData('inv-item', JSON.stringify(item))
-                    setDraggingItem(item.id)
-                  }}
-                  onDragEnd={() => setDraggingItem(null)}
-                  className={`flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-2 cursor-grab active:cursor-grabbing hover:bg-orange-100 transition-colors
-                    ${draggingItem === item.id ? 'opacity-50 scale-95' : ''}`}
-                >
-                  <div>
-                    <p className="text-xs font-medium text-stone-800">{item.name}</p>
-                    <p className="text-[10px] text-stone-400">{item.cat}</p>
+              {visibleInv.map(item => {
+                const payload = { id: item.id, name: item.item_name, cat: catMap[item.category_id] || '', status: item.status, qty: item.quantity }
+                const isDragging = dragging?.item.id === item.id
+                return (
+                  <div
+                    key={item.id}
+                    onMouseDown={e => onItemMouseDown(e, payload)}
+                    className={`flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-2 cursor-grab hover:bg-orange-100 transition-colors select-none
+                      ${isDragging ? 'opacity-40' : ''}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-stone-800 truncate">{item.item_name}</p>
+                      <p className="text-[10px] text-stone-400 truncate">{catMap[item.category_id] || ''}</p>
+                    </div>
+                    <span className={`${INV_STATUS_BADGE[item.status]} text-[9px] ml-1 flex-shrink-0`}>{item.status}</span>
                   </div>
-                  <span className={`${INV_STATUS_BADGE[item.status]} text-[9px]`}>{item.status}</span>
-                </div>
-              ))}
+                )
+              })}
+              {visibleInv.length === 0 && (
+                <p className="text-xs text-stone-400 text-center py-4">No items.</p>
+              )}
             </div>
           </div>
 
-          {/* right: meal slots */}
-          <div className="flex-1 p-5 overflow-y-auto">
+          {/* RIGHT: meal drop zones */}
+          <div className="flex-1 p-5 overflow-y-auto flex flex-col gap-3">
             {!row && (
-              <div className="mb-4 flex items-center gap-3">
+              <div className="flex items-center gap-3">
                 <label className="label mb-0 whitespace-nowrap">Day of month</label>
                 <input
                   type="number" min="1" max="31"
@@ -225,17 +273,15 @@ function MealPrepModal({ row, onSave, onClose }) {
                 />
               </div>
             )}
-            <div className="space-y-3">
-              {MEALS.map(m => (
-                <MealDropZone
-                  key={m}
-                  mealName={m}
-                  meal={meals[m]}
-                  onChange={updated => setMeals(prev => ({ ...prev, [m]: updated }))}
-                  draggingItem={draggingItem}
-                />
-              ))}
-            </div>
+            {MEALS.map(m => (
+              <MealDropZone
+                key={m}
+                mealName={m}
+                meal={meals[m]}
+                onChange={updated => setMeals(prev => ({ ...prev, [m]: updated }))}
+                activeOver={activeOver}
+              />
+            ))}
           </div>
         </div>
 
@@ -247,6 +293,17 @@ function MealPrepModal({ row, onSave, onClose }) {
           </button>
         </div>
       </div>
+
+      {/* Floating ghost that follows the cursor */}
+      {dragging && (
+        <div
+          ref={ghostRef}
+          className="fixed z-[100] pointer-events-none bg-white border-2 border-orange-400 rounded-lg px-3 py-2 shadow-xl text-xs font-medium text-orange-700 whitespace-nowrap"
+          style={{ left: dragging.x + 12, top: dragging.y - 16 }}
+        >
+          {dragging.item.name}
+        </div>
+      )}
     </div>
   )
 }
@@ -267,6 +324,8 @@ function ConfirmDelete({ day, onConfirm, onCancel }) {
   )
 }
 
+const INV_STATUS_OPTIONS = ['All', 'InUse', 'Stocked', 'Finished', 'NotInStock']
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function KitchenSlabPage() {
   const { getLabel } = useLabels()
@@ -274,12 +333,42 @@ export default function KitchenSlabPage() {
   const [month, setMonth]   = useState(now.getMonth() + 1)
   const [year, setYear]     = useState(now.getFullYear())
   const [rows, setRows]     = useState([])
-  const [catFilter, setCatFilter] = useState('All')
-  const [modalRow, setModalRow]   = useState(undefined) // undefined=closed, null=add, obj=edit
+  const [modalRow, setModalRow]   = useState(undefined)
   const [deleteRow, setDeleteRow] = useState(null)
   const [monthCreated, setMonthCreated] = useState(false)
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
+  // ── Inventory state ──────────────────────────────────────────────────────
+  const [inventory,   setInventory]   = useState([])
+  const [catMap,      setCatMap]      = useState({})
+  const [invLoading,  setInvLoading]  = useState(true)
+  const [nameSearch,  setNameSearch]  = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [catFilter,   setCatFilter]   = useState('All')
+  const [qtyMax,      setQtyMax]      = useState('')
+
+  useEffect(() => {
+    Promise.all([apiClient.get('/inventory/'), apiClient.get('/categories/')])
+      .then(([invRes, catRes]) => {
+        setInventory(invRes.data)
+        const m = {}
+        catRes.data.forEach(c => { m[c.id] = c.name })
+        setCatMap(m)
+      })
+      .catch(() => {})
+      .finally(() => setInvLoading(false))
+  }, [])
+
+  const invCatNames = ['All', ...new Set(inventory.map(i => catMap[i.category_id] || 'Unknown').filter(Boolean))]
+
+  const visibleInv = inventory.filter(i => {
+    if (nameSearch   && !i.item_name.toLowerCase().includes(nameSearch.toLowerCase())) return false
+    if (statusFilter !== 'All' && i.status !== statusFilter) return false
+    if (catFilter    !== 'All' && (catMap[i.category_id] || 'Unknown') !== catFilter) return false
+    if (qtyMax !== '' && (i.quantity ?? 0) > Number(qtyMax)) return false
+    return true
+  })
+
+  // ── Meal plan handlers ────────────────────────────────────────────────────
   const createMonth = () => setMonthCreated(true)
 
   const saveRow = useCallback((saved) => {
@@ -297,10 +386,6 @@ export default function KitchenSlabPage() {
     setDeleteRow(null)
   }, [deleteRow])
 
-  // ── Inventory section (mock data, filterable) ─────────────────────────────
-  const invCats = ['All', ...new Set(MOCK_INVENTORY.map(i => i.cat))]
-  const visibleInv = MOCK_INVENTORY.filter(i => catFilter === 'All' || i.cat === catFilter)
-
   return (
     <Layout>
       {/* ── Page header ── */}
@@ -311,20 +396,71 @@ export default function KitchenSlabPage() {
         </div>
       </div>
 
-      {/* ══ SECTION 1: Filtered Inventory ══ */}
+      {/* ══ SECTION 1: Kitchen Counter ══ */}
       <div className="card mb-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <h2 className="text-base font-semibold text-stone-800">📦 Kitchen Counter</h2>
-          <div className="flex gap-1.5 flex-wrap">
-            {invCats.map(c => (
-              <button key={c}
-                onClick={() => setCatFilter(c)}
-                className={catFilter === c ? 'tab-active text-xs py-1 px-3' : 'tab-inactive text-xs py-1 px-3'}>
-                {c}
-              </button>
-            ))}
-          </div>
+          {!invLoading && (
+            <span className="text-xs text-stone-400">{visibleInv.length} item{visibleInv.length !== 1 ? 's' : ''}</span>
+          )}
         </div>
+
+        {/* Filter bar */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-4 flex-wrap">
+          {/* Item name search */}
+          <div className="relative flex-1 min-w-[140px]">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+            </svg>
+            <input
+              className="input pl-8 text-sm"
+              placeholder="Search by name…"
+              value={nameSearch}
+              onChange={e => setNameSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Category filter */}
+          <select
+            className="input w-auto text-sm"
+            value={catFilter}
+            onChange={e => setCatFilter(e.target.value)}
+          >
+            {invCatNames.map(c => <option key={c}>{c}</option>)}
+          </select>
+
+          {/* Status filter */}
+          <select
+            className="input w-auto text-sm"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+          >
+            {INV_STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
+          </select>
+
+          {/* Max quantity filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-stone-500 whitespace-nowrap">Qty ≤</span>
+            <input
+              type="number" min="0"
+              className="input w-20 text-sm"
+              placeholder="Any"
+              value={qtyMax}
+              onChange={e => setQtyMax(e.target.value)}
+            />
+          </div>
+
+          {/* Clear filters */}
+          {(nameSearch || statusFilter !== 'All' || catFilter !== 'All' || qtyMax !== '') && (
+            <button
+              className="btn-ghost text-xs"
+              onClick={() => { setNameSearch(''); setStatusFilter('All'); setCatFilter('All'); setQtyMax('') }}
+            >
+              ✕ Clear
+            </button>
+          )}
+        </div>
+
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -337,22 +473,29 @@ export default function KitchenSlabPage() {
               </tr>
             </thead>
             <tbody>
-              {visibleInv.map(row => (
-                <tr key={row.id}
-                  draggable
-                  onDragStart={e => e.dataTransfer.setData('inv-item', JSON.stringify(row))}
-                  className="hover:bg-orange-50/50 transition-colors cursor-grab active:cursor-grabbing"
-                  title="Drag this item into a meal slot below"
-                >
-                  <td className="td font-medium text-stone-800">
-                    <span className="mr-1 text-stone-300">⠿</span>{row.name}
-                  </td>
-                  <td className="td text-stone-500">{row.cat}</td>
-                  <td className="td"><span className={INV_STATUS_BADGE[row.status]}>{row.status}</span></td>
-                  <td className="td">{row.qty}</td>
+              {invLoading && (
+                <tr><td colSpan={5} className="td text-center text-stone-400 py-8 text-sm">Loading…</td></tr>
+              )}
+              {!invLoading && visibleInv.length === 0 && (
+                <tr><td colSpan={5} className="td text-center text-stone-400 py-8 text-sm">No items match the current filters.</td></tr>
+              )}
+              {!invLoading && visibleInv.map(item => (
+                <tr key={item.id} className="hover:bg-orange-50/50 transition-colors">
+                  <td className="td font-medium text-stone-800">{item.item_name}</td>
+                  <td className="td text-stone-500 text-sm">{catMap[item.category_id] || '—'}</td>
                   <td className="td">
-                    <div className="w-24 bg-orange-100 rounded-full h-1.5">
-                      <div className="bg-orange-500 h-1.5 rounded-full" style={{ width: '50%' }} />
+                    <span className={INV_STATUS_BADGE[item.status] || 'badge-stone'}>{item.status}</span>
+                  </td>
+                  <td className="td text-stone-700">{item.quantity ?? '—'}</td>
+                  <td className="td">
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 bg-orange-100 rounded-full h-1.5 flex-shrink-0">
+                        <div
+                          className="bg-orange-500 h-1.5 rounded-full transition-all"
+                          style={{ width: `${item.usage_percentage ?? 0}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-stone-400">{item.usage_percentage ?? 0}%</span>
                     </div>
                   </td>
                 </tr>
@@ -360,7 +503,7 @@ export default function KitchenSlabPage() {
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-stone-400 mt-2">💡 Tip: drag any row into a meal slot in the planner below</p>
+        <p className="text-xs text-stone-400 mt-2">💡 Tip: use the meal planner below — drag inventory items from the panel into meal slots</p>
       </div>
 
       {/* ══ SECTION 2: Monthly Meal Prep Table ══ */}
@@ -458,6 +601,8 @@ export default function KitchenSlabPage() {
       {modalRow !== undefined && (
         <MealPrepModal
           row={modalRow}
+          inventory={inventory}
+          catMap={catMap}
           onSave={saveRow}
           onClose={() => setModalRow(undefined)}
         />

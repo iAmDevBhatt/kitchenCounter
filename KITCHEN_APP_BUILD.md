@@ -7,7 +7,7 @@
 
 ---
 
-## Implementation Status (last updated 2026-08-18)
+## Implementation Status (last updated 2026-08-19)
 
 ### ✅ Completed
 - All database models (SQLAlchemy `UUID(as_uuid=False)`), schemas (`str` UUIDs), and CRUD routers
@@ -19,8 +19,12 @@
 - Full frontend page structure: Login, Inventory, KitchenSlab, Configuration, Theme
 - InventoryTable: full CRUD, item image thumbnail + upload, tags picker (4-tab modal), stat cards, tab filters, sticky-header scrollable table
   - Tabs: **All Items** (+ Status + expiry date range filters) → **Currently in Stock** → **Running Low** → **Out of Stock**
+  - **Currently in Stock** tab fixed: shows only `Stocked` or `InUse` items (previously included all non-null statuses)
   - "Out of Stock" shows both `NotInStock` and `Finished` status
   - Usage slider auto-updates status via backend rules; status change reflects immediately in the correct tab
+  - **CategoryPicker** component (inline in `InventoryTable.jsx`): replaces native `<select>` with a polished floating dropdown showing full breadcrumb paths, depth dots, search, and checkmark on selected item
+  - **BulkImportExport** component (`InventoryTable/BulkImportExport.jsx`): Export to `.xlsx`/`.csv` (16 fields, human-readable names); Import from `.xlsx`/`.csv` with auto-create for missing categories/tags/locations, per-row progress modal
+  - npm deps added: `xlsx` (SheetJS), `papaparse`
 - TagManager: live API CRUD (was mocked) — supports types: vitamin, mineral, allergen, diet, general
 - UserManagement: live API CRUD (was mocked) — add, toggle-active, delete; self-protection (can't delete/deactivate own account)
 - Global theme system: `ThemeContext` (`frontend/src/context/ThemeContext.jsx`) — wallpaper + palette persisted to localStorage + backend; applied across all pages via `Layout.jsx`
@@ -28,6 +32,9 @@
 - `labels.properties` i18n system with `useLabels` hook
 - `start.ps1` / `stop.ps1` scripts (Windows, port 8001)
 - `seed_data.py` with admin user + KitchenCategories root node
+- **KitchenSlabPage**: replaced mock inventory data with real API data (`GET /inventory/` + `GET /categories/`); 4 filters (name, category, status, qty≤); scrollable table; pointer-based drag-and-drop (HTML5 drag API abandoned — broken in Chrome/Safari inside `overflow:scroll` ancestors); drag system uses mouse events, 4px threshold, document-level listeners via `useEffect`, refs for stale-closure avoidance, `elementFromPoint` + `[data-dropzone]` for hit testing
+- **DietStatsPage**: fixed `YEARS` array (was showing only future years); added `GET /stats/usage-trend` data fetch; added 3 new chart components: `UsageTrendChart` (stacked bar, top 10 items over 6 months), `CategoryUsagePie` (donut pie, category intensity), `MonthlyVolumeLine` (line chart, total item appearances per month)
+- **`GET /stats/usage-trend`** endpoint (`backend/routers/stats.py`): rolling 6-month window, no params, returns `months`/`top_items`/`category_totals`/`monthly_totals` — designed for AI/MCP tool calling
 - Tailwind CSS v3 + PostCSS; warm earthy UI (orange/amber, Inter font, card-based)
 - Docker: `docker-compose.yml` with named volumes for SQLite DB (`db_data`) and uploads (`uploads_data`); PostgreSQL opt-in via `--profile postgres`; data survives `docker compose up --build`
 
@@ -41,11 +48,11 @@
 - **`AIInsightsPanel` import:** Imports `../../api/client` — should be `../../api/index.js`.
 - **No `__init__.py`:** Relative imports work because `PYTHONPATH` is set in `main.py`.
 - **PWA:** `vite-plugin-pwa` not installed.
-- **shadcn/ui + @dnd-kit:** Not installed. UI is raw Tailwind; drag-and-drop is native HTML5.
+- **shadcn/ui + @dnd-kit:** Not installed. UI is raw Tailwind; drag-and-drop uses a custom mouse-event system (not HTML5 drag API and not @dnd-kit).
 - **Zustand store:** Not created. State is local `useState` + `ThemeContext`.
 
 ### 🔜 Next phases
-- **Phase 6 (AI):** Mount MCP server; fix `get_db()` in tools; implement `messages.create()` in `claude_client.py`; add `/ai-insights/mcp` route; fix `AIInsightsPanel` import
+- **Phase 6 (AI):** Mount MCP server; fix `get_db()` in tools; implement `messages.create()` in `claude_client.py`; add `/ai-insights/mcp` route; fix `AIInsightsPanel` import; expose `GET /stats/usage-trend` as an MCP tool
 - **Phase 7 (PWA):** Install `vite-plugin-pwa`; configure service worker + manifest
 - **Phase 8 (Nutrition charts):** Nutrient intake pie charts by month — aggregate nutrition fields from inventory items linked to meal prep entries, grouped by tag
 

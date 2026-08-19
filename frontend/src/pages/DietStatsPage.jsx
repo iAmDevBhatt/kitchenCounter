@@ -3,6 +3,7 @@ import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   RadarChart, PolarGrid, PolarAngleAxis, Radar,
+  LineChart, Line,
 } from 'recharts'
 import Layout from '../components/Layout/Layout'
 import apiClient from '../api/index.js'
@@ -187,26 +188,103 @@ function InventoryOverview({ overview }) {
   )
 }
 
+// ── 6-month item usage trend (grouped bar per item) ───────────────────────────
+function UsageTrendChart({ trend }) {
+  if (!trend?.top_items?.length) {
+    return <p className="text-sm text-stone-400 text-center py-8">No meal-prep data in the last 6 months.</p>
+  }
+
+  // Build one row per month; each row has a key per item name
+  const rows = trend.months.map((m, idx) => {
+    const row = { month: m.label }
+    trend.top_items.forEach(item => { row[item.name] = item.monthly_counts[idx] })
+    return row
+  })
+
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={rows} margin={{ left: 0, right: 16, top: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+        <Tooltip />
+        <Legend wrapperStyle={{ fontSize: 11 }} />
+        {trend.top_items.map((item, i) => (
+          <Bar key={item.id} dataKey={item.name} stackId="a"
+            fill={FALLBACK_COLORS[i % FALLBACK_COLORS.length]} radius={i === trend.top_items.length - 1 ? [4,4,0,0] : [0,0,0,0]} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ── 6-month category intensity pie ────────────────────────────────────────────
+function CategoryUsagePie({ trend }) {
+  const data = (trend?.category_totals || []).slice(0, 10)
+  if (!data.length) return <p className="text-sm text-stone-400 text-center py-8">No data.</p>
+
+  const LABEL_THRESHOLD = 0.04  // hide labels for slices < 4%
+  const total = data.reduce((s, d) => s + d.count, 0)
+
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <PieChart>
+        <Pie
+          data={data} dataKey="count" nameKey="name"
+          cx="50%" cy="50%" outerRadius={110} innerRadius={50}
+          label={({ name, percent }) => percent > LABEL_THRESHOLD ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+          labelLine={false}
+        >
+          {data.map((entry, i) => <Cell key={entry.category_id || i} fill={FALLBACK_COLORS[i % FALLBACK_COLORS.length]} />)}
+        </Pie>
+        <Tooltip formatter={(v, n) => [`${v} appearances`, n]} />
+        <Legend wrapperStyle={{ fontSize: 11 }} />
+      </PieChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ── Monthly volume line ───────────────────────────────────────────────────────
+function MonthlyVolumeLine({ trend }) {
+  const data = trend?.monthly_totals || []
+  if (!data.length) return null
+  return (
+    <ResponsiveContainer width="100%" height={160}>
+      <LineChart data={data} margin={{ left: 0, right: 16, top: 4, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+        <Tooltip formatter={v => [`${v} item appearances`]} />
+        <Line type="monotone" dataKey="total_items" stroke="#f97316" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function DietStatsPage() {
-  const [year,   setYear]   = useState(now.getFullYear())
-  const [month,  setMonth]  = useState(now.getMonth() + 1)
-  const [diet,   setDiet]   = useState(null)
-  const [inv,    setInv]    = useState(null)
+  const [year,    setYear]    = useState(now.getFullYear())
+  const [month,   setMonth]   = useState(now.getMonth() + 1)
+  const [diet,    setDiet]    = useState(null)
+  const [inv,     setInv]     = useState(null)
+  const [trend,   setTrend]   = useState(null)
   const [loading, setLoading] = useState(false)
-  const [err,    setErr]    = useState('')
+  const [err,     setErr]     = useState('')
 
-  const YEARS = Array.from({ length: 80 }, (_, i) => now.getFullYear() + i)
+  // Past 10 years → present
+  const YEARS = Array.from({ length: 11 }, (_, i) => now.getFullYear() - 10 + i)
 
   const load = useCallback(async () => {
     setLoading(true); setErr('')
     try {
-      const [dietRes, invRes] = await Promise.all([
+      const [dietRes, invRes, trendRes] = await Promise.all([
         apiClient.get(`/stats/dietary/${year}/${month}`),
         apiClient.get('/stats/inventory-overview'),
+        apiClient.get('/stats/usage-trend'),
       ])
       setDiet(dietRes.data)
       setInv(invRes.data)
+      setTrend(trendRes.data)
     } catch (e) {
       setErr('Failed to load stats: ' + (e?.response?.data?.detail || e.message || 'unknown error'))
     } finally {
@@ -339,6 +417,61 @@ export default function DietStatsPage() {
             </>
           )}
         </>
+      )}
+
+      {/* ── Usage trend — 6-month rolling ── */}
+      {!loading && trend && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-stone-800 mb-1">Usage Trends — Last 6 Months</h2>
+          <p className="text-sm text-stone-500 mb-4">
+            Which items and categories are appearing most in your meal prep
+          </p>
+
+          {/* summary pills */}
+          <div className="flex flex-wrap gap-3 mb-6">
+            <StatPill
+              label="Unique items used"
+              value={trend.top_items?.length ?? 0}
+              color="#f97316"
+            />
+            <StatPill
+              label="Categories active"
+              value={trend.category_totals?.length ?? 0}
+              color="#3b82f6"
+            />
+            <StatPill
+              label="Total appearances"
+              value={(trend.monthly_totals || []).reduce((a, b) => a + b.total_items, 0)}
+              color="#22c55e"
+            />
+          </div>
+
+          {/* monthly volume sparkline */}
+          <ChartCard
+            title="Monthly Meal-Prep Volume"
+            subtitle="Total inventory item appearances per month"
+          >
+            <MonthlyVolumeLine trend={trend} />
+          </ChartCard>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            {/* stacked bar — top items per month */}
+            <ChartCard
+              title="Top Items — Monthly Breakdown"
+              subtitle="How often each of the top 10 items appeared in meal prep each month (stacked)"
+            >
+              <UsageTrendChart trend={trend} />
+            </ChartCard>
+
+            {/* donut — category intensity */}
+            <ChartCard
+              title="Category Usage Intensity"
+              subtitle="Which categories dominate your meal prep over the last 6 months"
+            >
+              <CategoryUsagePie trend={trend} />
+            </ChartCard>
+          </div>
+        </div>
       )}
 
       {/* ── Inventory overview (always shown, independent of month) ── */}

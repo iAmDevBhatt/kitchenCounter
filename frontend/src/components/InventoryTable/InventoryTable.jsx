@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import apiClient from '../../api/index.js'
+import BulkImportExport from './BulkImportExport.jsx'
 
 const STATUS_OPTIONS = ['Stocked', 'InUse', 'Finished', 'NotInStock']
 const STATUS_BADGE = {
@@ -88,6 +89,120 @@ function ImageUpload({ current, onChange }) {
         >
           Remove image
         </button>
+      )}
+    </div>
+  )
+}
+
+// ── Category picker (custom searchable dropdown) ──────────────────────────────
+function CategoryPicker({ categories, value, onChange }) {
+  const [open, setOpen]     = useState(false)
+  const [query, setQuery]   = useState('')
+  const ref                 = useRef()
+
+  const selected = categories.find(c => c.id === value)
+
+  // Build a readable breadcrumb path for a category
+  function breadcrumb(cat) {
+    if (!cat) return ''
+    // Walk up by depth — categories are already flattened in DFS order
+    const path = []
+    let depth = cat.depth
+    for (let i = categories.indexOf(cat); i >= 0 && depth >= 0; i--) {
+      if (categories[i].depth === depth) {
+        path.unshift(categories[i].name)
+        depth--
+      }
+    }
+    return path.join(' › ')
+  }
+
+  const filtered = query.trim()
+    ? categories.filter(c => c.name.toLowerCase().includes(query.toLowerCase()))
+    : categories
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const INDENT = ['', 'pl-4', 'pl-8', 'pl-12', 'pl-16', 'pl-20']
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => { setOpen(o => !o); setQuery('') }}
+        className={`input w-full text-left flex items-center justify-between gap-2
+          ${!selected ? 'text-stone-400' : 'text-stone-800'}`}
+      >
+        <span className="truncate">
+          {selected ? breadcrumb(selected) : 'Select a category…'}
+        </span>
+        <svg className={`w-4 h-4 flex-shrink-0 text-stone-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-orange-200 rounded-xl shadow-lg overflow-hidden">
+          {/* Search */}
+          <div className="px-3 pt-3 pb-2 border-b border-stone-100">
+            <div className="relative">
+              <svg className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+              </svg>
+              <input
+                autoFocus
+                className="w-full pl-7 pr-3 py-1.5 text-sm rounded-lg border border-stone-200 focus:outline-none focus:border-orange-400"
+                placeholder="Search categories…"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Options list */}
+          <div className="max-h-56 overflow-y-auto py-1">
+            {filtered.length === 0 && (
+              <p className="px-4 py-3 text-sm text-stone-400 text-center">No categories found</p>
+            )}
+            {filtered.map(c => {
+              const isSelected = c.id === value
+              const indent = INDENT[Math.min(c.depth, INDENT.length - 1)]
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => { onChange(c.id); setOpen(false) }}
+                  className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-orange-50 transition-colors
+                    ${isSelected ? 'bg-orange-50 text-orange-700 font-medium' : 'text-stone-700'}
+                    ${indent}`}
+                >
+                  {/* depth indicator dots */}
+                  {c.depth > 0 && (
+                    <span className="flex-shrink-0 flex gap-0.5">
+                      {Array.from({ length: c.depth }).map((_, i) => (
+                        <span key={i} className="w-1 h-1 rounded-full bg-stone-300 inline-block" />
+                      ))}
+                    </span>
+                  )}
+                  <span className="truncate">{c.name}</span>
+                  {isSelected && (
+                    <svg className="ml-auto w-3.5 h-3.5 flex-shrink-0 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
       )}
     </div>
   )
@@ -235,12 +350,11 @@ function ItemModal({ item, categories, locations, onSave, onClose }) {
               </div>
               <div className="col-span-2">
                 <label className="label">Category *</label>
-                <select className="input" value={form.category_id} onChange={e => set('category_id', e.target.value)}>
-                  <option value="">— Select category —</option>
-                  {categories.map(c => (
-                    <option key={c.id} value={c.id}>{'— '.repeat(c.depth)}{c.name}</option>
-                  ))}
-                </select>
+                <CategoryPicker
+                  categories={categories}
+                  value={form.category_id}
+                  onChange={v => set('category_id', v)}
+                />
               </div>
               <div className="col-span-2">
                 <label className="label">Stored Location</label>
@@ -601,7 +715,7 @@ export default function InventoryTable({ statusFilter, showAllFilters, onStatsCh
     <div>
       {/* Filter bar */}
       <div className="flex flex-col gap-3 mb-4">
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -614,6 +728,7 @@ export default function InventoryTable({ statusFilter, showAllFilters, onStatsCh
               <option key={c.id} value={c.id}>{'— '.repeat(c.depth - 1)}{c.name}</option>
             ))}
           </select>
+          <BulkImportExport items={items} catMap={catMap} locMap={locMap} onDone={load} />
         </div>
 
         {showAllFilters && (

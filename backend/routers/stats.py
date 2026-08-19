@@ -7,7 +7,9 @@ from ..models.meal_prep import MealPrep, MealPrepEntry, MealPrepItem
 from ..models.inventory import InventoryItem
 from ..models.inventory_tag import InventoryItemTag
 from ..models.tag import Tag
+from ..models.category import Category
 from collections import defaultdict
+from datetime import date
 
 router = APIRouter()
 
@@ -186,4 +188,119 @@ def inventory_overview(db: Session = Depends(get_db)):
         "status_breakdown": [{"status": k, "count": v} for k, v in status_counts.items()],
         "expiry_breakdown": [{"bucket": k, "count": v} for k, v in expiry_buckets.items()],
         "top_categories": top_categories,
+    }
+
+
+@router.get("/usage-trend")
+def usage_trend(db: Session = Depends(get_db)):
+    """
+    Rolling 6-month usage trend — designed for AI/MCP tool calling (no parameters needed).
+
+    Returns:
+      months:          [{label, year, month}]           — ordered oldest → newest
+      top_items:       [{id, name, monthly_counts}]     — top 10 items by total appearances;
+                       monthly_counts is a list aligned to `months`
+      category_totals: [{category_id, name, count}]     — total appearances per category
+                       across all 6 months, sorted desc — for pie chart
+      monthly_totals:  [{label, total_items}]            — total item appearances per month
+    """
+    today = date.today()
+
+    # Build the 6 month windows: oldest first
+    windows = []
+    y, m = today.year, today.month
+    for _ in range(6):
+        windows.insert(0, (y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+
+    month_labels = [f"{date(y, m, 1).strftime('%b')} {y}" for y, m in windows]
+
+    # Pre-load all category names once
+    cat_name_map = {c.id: c.name for c in db.query(Category).all()}
+
+    # Aggregate per month
+    all_item_usage: dict[str, list[int]] = defaultdict(lambda: [0] * 6)
+    item_name_map: dict[str, str] = {}
+    item_cat_map: dict[str, str] = {}
+    monthly_totals: list[int] = []
+
+    for idx, (yr, mo) in enumerate(windows):
+        preps = db.query(MealPrep).filter(
+            MealPrep.year == yr, MealPrep.month == mo
+        ).all()
+        if not preps:
+            monthly_totals.append(0)
+            continue
+
+        entries = db.query(MealPrepEntry).filter(
+            MealPrepEntry.meal_prep_id.in_([p.id for p in preps])
+        ).all()
+        if not entries:
+            monthly_totals.append(0)
+            continue
+
+        mp_items = db.query(MealPrepItem).filter(
+            MealPrepItem.meal_prep_entry_id.in_([e.id for e in entries])
+        ).all()
+        if not mp_items:
+            monthly_totals.append(0)
+            continue
+
+        inv_ids = list({m.inventory_item_id for m in mp_items})
+        inv_items = db.query(InventoryItem).filter(InventoryItem.id.in_(inv_ids)).all()
+        for it in inv_items:
+            item_name_map[it.id] = it.item_name
+            item_cat_map[it.id] = it.category_id
+
+        month_count = defaultdict(int)
+        for mp in mp_items:
+            month_count[mp.inventory_item_id] += 1
+
+        total = 0
+        for item_id, cnt in month_count.items():
+            all_item_usage[item_id][idx] += cnt
+            total += cnt
+        monthly_totals.append(total)
+
+    # Top 10 items by total usage across 6 months
+    item_totals = {iid: sum(counts) for iid, counts in all_item_usage.items()}
+    top_ids = sorted(item_totals, key=lambda x: item_totals[x], reverse=True)[:10]
+
+    top_items = [
+        {
+            "id": iid,
+            "name": item_name_map.get(iid, iid),
+            "monthly_counts": all_item_usage[iid],
+            "total": item_totals[iid],
+        }
+        for iid in top_ids
+    ]
+
+    # Category totals across all 6 months
+    cat_totals: dict[str, int] = defaultdict(int)
+    for iid, total in item_totals.items():
+        cat_id = item_cat_map.get(iid)
+        if cat_id:
+            cat_totals[cat_id] += total
+
+    category_totals = sorted(
+        [
+            {"category_id": cid, "name": cat_name_map.get(cid, "Unknown"), "count": cnt}
+            for cid, cnt in cat_totals.items()
+        ],
+        key=lambda x: x["count"],
+        reverse=True,
+    )
+
+    return {
+        "months": [{"label": lbl, "year": y, "month": m} for lbl, (y, m) in zip(month_labels, windows)],
+        "top_items": top_items,
+        "category_totals": category_totals,
+        "monthly_totals": [
+            {"label": month_labels[i], "total_items": monthly_totals[i]}
+            for i in range(6)
+        ],
     }
