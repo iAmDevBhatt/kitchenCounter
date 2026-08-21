@@ -23,14 +23,19 @@ if [ "$PUID" != "0" ] && [ "$PGID" != "0" ]; then
     fi
     USER_NAME="$(getent passwd "$PUID" | cut -d: -f1)"
 
-    chown -R "$PUID:$PGID" /app/static/uploads /data/db 2>/dev/null || true
+    chown -R "$PUID:$PGID" /app/backend/static/uploads /data/db 2>/dev/null || true
     RUN_AS="gosu ${USER_NAME}:${GROUP_NAME}"
 else
     echo "[entrypoint] PUID/PGID not set (or 0) — running as root"
 fi
 
+# Run via `python -m` (not the bare `python backend/init_db.py` / `uvicorn`
+# executables) so /app is added to sys.path and `backend` resolves as the
+# top-level package that its internal `from ..database import ...`-style
+# imports require — this matches how start.ps1 runs it locally
+# (`python -m uvicorn backend.main:app` from the repo root).
 echo "[entrypoint] Running database init & seed..."
-$RUN_AS python /app/init_db.py
+$RUN_AS python -m backend.init_db
 
 echo "[entrypoint] Starting uvicorn on port ${PORT}..."
-exec $RUN_AS uvicorn main:app --host 0.0.0.0 --port "${PORT}"
+exec $RUN_AS python -m uvicorn backend.main:app --host 0.0.0.0 --port "${PORT}"

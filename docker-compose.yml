@@ -63,7 +63,7 @@ services:
       PUID: "0"
       PGID: "0"
     volumes:
-      - uploads_data:/app/static/uploads   # item images — survives rebuilds
+      - uploads_data:/app/backend/static/uploads   # item images — survives rebuilds
       - db_data:/data/db                   # SQLite DB — survives rebuilds
     networks:
       - blr-net

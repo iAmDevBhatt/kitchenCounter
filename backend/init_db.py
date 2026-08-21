@@ -1,21 +1,29 @@
 """
 Startup initializer: create all tables then seed default data.
-Run automatically by the Docker entrypoint before uvicorn starts.
+Run automatically by the Docker entrypoint before uvicorn starts
+(`python -m backend.init_db`, so this module loads as `backend.init_db` —
+required by the `from ..database import ...`-style relative imports used
+throughout backend/models, backend/routers, etc.). Mirrors the import style
+already used by seed_data.py for local dev.
 """
 from __future__ import annotations
 import os, uuid, sys
+from pathlib import Path
 
-# Ensure the package root is on sys.path when run as `python init_db.py`
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Belt-and-suspenders: make sure the repo-root-equivalent (/app in Docker) is
+# on sys.path even if this ever gets run directly instead of via `-m`.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
-from database import engine, Base, SessionLocal
-from models import (
+from backend.database import engine, Base, SessionLocal
+from backend.models import (
     user, category, inventory as inv_model,
     meal_prep as mp_model, tag, theme as theme_model,
     inventory_tag, storage_location as storage_location_model,
 )
-from models.user import User
-from models.category import Category
+from backend.models.user import User
+from backend.models.category import Category
 from passlib.context import CryptContext
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")

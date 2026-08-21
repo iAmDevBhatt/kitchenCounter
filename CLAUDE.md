@@ -396,8 +396,23 @@ Also fixed: `YEARS` array now covers `now.getFullYear() - 10` through present (w
 **Single image** (`Dockerfile`, project root) — replaces the old `Dockerfile.backend` +
 `Dockerfile.frontend` + nginx setup:
 1. **Stage 1** (`node:18-alpine`): `npm ci && npm run build` in `frontend/` → `dist/`
-2. **Stage 2** (`python:3.11-slim`): installs backend deps, copies `backend/`, copies stage 1's
-   `dist/` in as `backend/frontend_dist/`, then runs `docker-entrypoint.sh`
+2. **Stage 2** (`python:3.11-slim`): installs backend deps, copies `backend/` to **`/app/backend/`**
+   (kept nested, not flattened into `/app`), copies stage 1's `dist/` in as
+   `/app/backend/frontend_dist/`, then runs `docker-entrypoint.sh`
+
+> **Why nested and not flattened:** every module under `backend/` (models, routers, schemas, ai)
+> uses two-dot relative imports like `from ..database import Base`, which only resolve if
+> `backend` is importable as the top-level package containing them (i.e. `backend.models.user`)
+> — exactly how local dev already runs it: `python -m uvicorn backend.main:app` from the repo
+> root (`start.ps1`). Flattening `backend/`'s contents directly into `/app` (the original
+> `Dockerfile.backend` did this) turns `models` into a *bare* top-level package with no parent,
+> so those same imports fail with `ImportError: attempted relative import beyond top-level
+> package`. `docker-entrypoint.sh` therefore always runs things as `python -m backend.init_db` /
+> `python -m uvicorn backend.main:app` (from `WORKDIR /app`), never as bare `python init_db.py` /
+> `uvicorn main:app` — `python -m` is what puts `/app` on `sys.path` so `backend` resolves.
+> `backend/init_db.py` imports via `from backend.database import ...` / `from backend.models import
+> ...` for the same reason (mirrors `backend/seed_data.py`, which already did this correctly for
+> local dev).
 
 At runtime, FastAPI (`backend/main.py`) itself serves the built frontend — no nginx container:
 - `GET /assets/*` → `StaticFiles` mount of `frontend_dist/assets`
@@ -410,9 +425,9 @@ At runtime, FastAPI (`backend/main.py`) itself serves the built frontend — no 
   unaffected; the frontend's `axios baseURL: '/api'` now hits this middleware instead of a proxy.
 
 `docker-entrypoint.sh` also handles `PUID`/`PGID` env vars (default `0` = run as root): if both
-are set non-zero it creates a matching user/group, `chown`s `/app/static/uploads` and `/data/db`,
-then runs `init_db.py` and `uvicorn` via `gosu` as that user — useful when those paths are host
-bind-mounts (as in the blr-stack deployment below) so file ownership matches the host.
+are set non-zero it creates a matching user/group, `chown`s `/app/backend/static/uploads` and
+`/data/db`, then runs `init_db.py` and `uvicorn` via `gosu` as that user — useful when those paths
+are host bind-mounts (as in the blr-stack deployment below) so file ownership matches the host.
 
 ```
 # SQLite (default — no extra services needed):
@@ -425,7 +440,7 @@ docker compose --profile postgres up --build
 Named volumes ensure data persists across redeployments (`docker compose up --build` is safe):
 | Volume | Mount | Contains |
 |---|---|---|
-| `uploads_data` | `/app/static/uploads` | All uploaded images (item + wallpaper) |
+| `uploads_data` | `/app/backend/static/uploads` | All uploaded images (item + wallpaper) |
 | `db_data` | `/data/db` | SQLite database file (`kitchendb.sqlite`) |
 | `postgres_data` | `/var/lib/postgresql/data` | Postgres data (only with `--profile postgres`) |
 
@@ -500,7 +515,7 @@ kitchencounter:
     PUID: "3000"
     PGID: "3000"
   volumes:
-    - /opt/blr-stack/kitchenCounter/app/static/uploads:/app/static/uploads
+    - /opt/blr-stack/kitchenCounter/app/static/uploads:/app/backend/static/uploads
     - /opt/blr-stack/kitchenCounter/app/data:/data/db
   ports:
     - "8007:8000"
@@ -516,7 +531,7 @@ kitchencounter:
 **Data persistence (named volumes survive `docker compose down` and rebuilds):**
 | Volume | Mounted at | Contents |
 |---|---|---|
-| `uploads_data` | `/app/static/uploads` | Item images |
+| `uploads_data` | `/app/backend/static/uploads` | Item images |
 | `db_data` | `/data/db` | SQLite database file |
 | `postgres_data` | `/var/lib/postgresql/data` | PostgreSQL data (postgres profile) |
 

@@ -26,11 +26,17 @@ RUN apt-get update \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend/ .
-COPY --from=frontend-build /src/frontend/dist ./frontend_dist
+# Copied as a nested ./backend package (not flattened into /app) because
+# every module in it uses `from ..database import ...`-style relative
+# imports that assume `backend` is the top-level package — exactly how
+# local dev runs it (`python -m uvicorn backend.main:app` from the repo
+# root). Flattening breaks those imports with "attempted relative import
+# beyond top-level package".
+COPY backend/ ./backend/
+COPY --from=frontend-build /src/frontend/dist ./backend/frontend_dist
 
 # Persistent directories — bind-mounted as volumes in docker-compose
-RUN mkdir -p /app/static/uploads /data/db
+RUN mkdir -p /app/backend/static/uploads /data/db
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
