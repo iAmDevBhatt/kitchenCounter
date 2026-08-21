@@ -7,7 +7,7 @@ COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend/ ./
-RUN npm run build
+RUN chmod +x node_modules/.bin/* && npm run build
 # -> /src/frontend/dist
 
 # ── Stage 2: backend runtime, also serves the built frontend ──────────────
