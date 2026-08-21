@@ -127,7 +127,9 @@ async def upload_item_image(item_id: str, file: UploadFile = File(...), db: Sess
     if ext not in allowed_extensions:
         raise HTTPException(status_code=400, detail="Invalid file type. Only PNG, JPG, JPEG, and GIF are allowed.")
 
-    upload_dir = "backend/static/uploads"
+    # Resolve relative to this file (not CWD) so it's correct regardless of
+    # where the process is launched from — matches main.py's static mount.
+    upload_dir = str(Path(__file__).resolve().parent.parent / "static" / "uploads")
     os.makedirs(upload_dir, exist_ok=True)
 
     filename = f"{stdlib_uuid.uuid4()}{ext}"

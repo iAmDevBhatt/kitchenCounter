@@ -13,6 +13,7 @@ os.environ["PYTHONPATH"] = str(Path(__file__).resolve().parent.parent)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from .database import engine, Base
 from .routers import auth, categories, inventory, meal_prep, tags, theme, ai_insights, storage_locations, stats
 # import all models so Base.metadata.create_all sees every table
@@ -23,6 +24,30 @@ from pathlib import Path
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="KitchenCounter API")
+
+
+class StripApiPrefixMiddleware:
+    """Rewrites /api/* -> /* before routing.
+
+    In dev, Vite's proxy already strips this prefix before the request
+    reaches uvicorn (see frontend/vite.config.js), so this is a no-op there.
+    In the single-container production image there is no nginx/Vite in front
+    of the app anymore, so the built frontend's `/api/...` fetches need to be
+    rewritten here instead. Keeping routers registered unprefixed (as below)
+    means the routes documented in CLAUDE.md and /docs stay unchanged.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"].startswith("/api/"):
+            scope = dict(scope)
+            scope["path"] = scope["path"][len("/api"):]
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(StripApiPrefixMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,6 +72,23 @@ app.include_router(storage_locations.router, prefix="/storage-locations", tags=[
 app.include_router(stats.router, prefix="/stats", tags=["Stats"])
 
 
-@app.get("/")
-async def root():
-    return {"message": "KitchenCounter API is running"}
+# ── Serve the built frontend (single-container production image) ──────────
+# Populated by the Dockerfile's frontend build stage; absent in local dev,
+# where the Vite dev server (port 5173) serves the frontend instead.
+_serve_static = os.environ.get("SERVE_STATIC", "true").lower() in ("1", "true", "yes")
+_frontend_dist = Path(__file__).resolve().parent / "frontend_dist"
+
+if _serve_static and _frontend_dist.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(_frontend_dist / "assets")), name="frontend-assets")
+
+    @app.get("/", include_in_schema=False)
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_frontend(full_path: str = ""):
+        # Routers above (/auth, /categories, /static, ...) and the /assets
+        # mount already claimed their paths, so anything reaching here is a
+        # client-side (react-router) route — hand back the SPA shell.
+        return FileResponse(str(_frontend_dist / "index.html"))
+else:
+    @app.get("/")
+    async def root():
+        return {"message": "KitchenCounter API is running"}

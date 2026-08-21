@@ -37,6 +37,7 @@
 - **`GET /stats/usage-trend`** endpoint (`backend/routers/stats.py`): rolling 6-month window, no params, returns `months`/`top_items`/`category_totals`/`monthly_totals` — designed for AI/MCP tool calling
 - Tailwind CSS v3 + PostCSS; warm earthy UI (orange/amber, Inter font, card-based)
 - Docker: `docker-compose.yml` with named volumes for SQLite DB (`db_data`) and uploads (`uploads_data`); PostgreSQL opt-in via `--profile postgres`; data survives `docker compose up --build`
+- **Session 5 (2026-08-21):** Consolidated `Dockerfile.backend` + `Dockerfile.frontend` + nginx into a single root `Dockerfile` (multi-stage: builds the frontend, then the FastAPI backend serves the built static files directly — see CLAUDE.md §Docker Deployment). Fixed an image-upload path bug (`routers/inventory.py` was writing outside the mounted volume under Docker) and a missing-env-var crash risk (`config.py` `upload_dir` had no default). §3 and §11.2 below still describe the original two-Dockerfile/nginx design — kept for history, superseded by CLAUDE.md.
 
 ### ⚠️ Deviations from spec / known issues
 - **Database:** SQLite used for dev AND optionally production (intentional user decision). PostgreSQL available via Docker profile. Alembic not configured — `Base.metadata.create_all()` handles schema.

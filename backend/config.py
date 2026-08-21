@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     database_url: str
     secret_key: str
     access_token_expire_minutes: int = 480
-    upload_dir: str
+    upload_dir: str = "backend/static/uploads"
     anthropic_api_key: Optional[str] = None
     mcp_enabled: bool = True
     cors_origins: str = "*"

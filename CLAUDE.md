@@ -135,8 +135,8 @@ KitchenCounter/
 │   ├── vite.config.js          # Proxy: /api → :8001, /static → :8001
 │   └── package.json
 ├── docker-compose.yml          # SQLite default; --profile postgres for Postgres
-├── Dockerfile.backend
-├── Dockerfile.frontend
+├── Dockerfile                  # Single image: builds frontend, backend serves it + the API
+├── docker-entrypoint.sh        # PUID/PGID setup, DB init/seed, then execs uvicorn on $PORT
 ├── start.ps1                   # Windows: starts backend (:8001) + frontend (:5173)
 ├── stop.ps1
 ├── start.sh
@@ -393,6 +393,27 @@ Also fixed: `YEARS` array now covers `now.getFullYear() - 10` through present (w
 
 ## Docker Deployment
 
+**Single image** (`Dockerfile`, project root) — replaces the old `Dockerfile.backend` +
+`Dockerfile.frontend` + nginx setup:
+1. **Stage 1** (`node:18-alpine`): `npm ci && npm run build` in `frontend/` → `dist/`
+2. **Stage 2** (`python:3.11-slim`): installs backend deps, copies `backend/`, copies stage 1's
+   `dist/` in as `backend/frontend_dist/`, then runs `docker-entrypoint.sh`
+
+At runtime, FastAPI (`backend/main.py`) itself serves the built frontend — no nginx container:
+- `GET /assets/*` → `StaticFiles` mount of `frontend_dist/assets`
+- `GET /{anything not matched by a router above}` → `frontend_dist/index.html` (SPA fallback,
+  gated by `SERVE_STATIC` env var, default `true`; skipped entirely if `frontend_dist/` doesn't
+  exist — e.g. local `uvicorn backend.main:app` dev runs)
+- `StripApiPrefixMiddleware` rewrites `/api/*` → `/*` before routing, since there's no
+  nginx/Vite proxy left to do that stripping in front of the single container. Routers stay
+  registered unprefixed (`/auth`, `/categories`, ...) so the route table above and `/docs` are
+  unaffected; the frontend's `axios baseURL: '/api'` now hits this middleware instead of a proxy.
+
+`docker-entrypoint.sh` also handles `PUID`/`PGID` env vars (default `0` = run as root): if both
+are set non-zero it creates a matching user/group, `chown`s `/app/static/uploads` and `/data/db`,
+then runs `init_db.py` and `uvicorn` via `gosu` as that user — useful when those paths are host
+bind-mounts (as in the blr-stack deployment below) so file ownership matches the host.
+
 ```
 # SQLite (default — no extra services needed):
 docker compose up --build
@@ -411,6 +432,9 @@ Named volumes ensure data persists across redeployments (`docker compose up --bu
 > **Warning:** `docker compose down -v` deletes all volumes. Never run this in production.
 
 SQLite `DATABASE_URL` in Docker: `sqlite:////data/db/kitchendb.sqlite` (4 slashes = absolute path).
+
+Container listens on `$PORT` (default `8000`, set via env var) — this is unrelated to the
+dev-only "backend port is 8001" rule above, which applies only to `start.ps1`/local `uvicorn`.
 
 ## How to Run (Development)
 
@@ -446,17 +470,48 @@ docker compose up --build -d
 ```
 
 **Merge into parent docker-compose.yml:**
-- Copy the `services:` and `volumes:` blocks from this project's `docker-compose.yml`
+- Copy the `kitchencounter` service block (and `postgres_data`/`uploads_data`/`db_data` volumes,
+  or point them at bind-mount paths as below) from this project's `docker-compose.yml`
 - Declare a shared network `blr-net` in the parent file (or adjust the network name)
-- Frontend access: `http://<host>:3080`
-- Backend access: `http://<host>:8001`
+- Single container serves both frontend and API — pick one host port for it (example below uses
+  `8007` → container's `$PORT`, default `8000`)
 
 **Container names:**
 | Container | Name |
 |---|---|
-| PostgreSQL | `kitchencounter-db` |
-| Backend | `kitchencounter-backend` |
-| Frontend | `kitchencounter-frontend` |
+| PostgreSQL (optional) | `kitchencounter-db` |
+| App (frontend + backend) | `kitchencounter` |
+
+Example service block using bind-mount volumes under `/opt/blr-stack/` (matches this repo's
+`docker-compose.yml`, just with bind mounts instead of named volumes):
+```yaml
+kitchencounter:
+  build:
+    context: ./kitchenCounter
+    dockerfile: Dockerfile
+  container_name: kitchencounter
+  restart: unless-stopped
+  environment:
+    DATABASE_URL: sqlite:////data/db/kitchencounter.db
+    SECRET_KEY: change-me-in-production-use-a-long-random-string
+    ACCESS_TOKEN_EXPIRE_MINUTES: "1440"   # 24h
+    SERVE_STATIC: "true"
+    PORT: "8000"
+    PUID: "3000"
+    PGID: "3000"
+  volumes:
+    - /opt/blr-stack/kitchenCounter/app/static/uploads:/app/static/uploads
+    - /opt/blr-stack/kitchenCounter/app/data:/data/db
+  ports:
+    - "8007:8000"
+  networks:
+    - blr-net
+```
+> `DATABASE_URL` and the second volume must agree on the container-side path (`/data/db` here) —
+> a mismatch there means the DB file silently lands outside the mounted volume and is lost on
+> rebuild. This repo has no `JWT_SECRET`/`JWT_EXPIRY_HOURS` env vars (a different app's naming
+> convention) — this app reads `SECRET_KEY` and `ACCESS_TOKEN_EXPIRE_MINUTES` (minutes, not
+> hours) instead, per [Environment Variables](#environment-variables-env) above.
 
 **Data persistence (named volumes survive `docker compose down` and rebuilds):**
 | Volume | Mounted at | Contents |

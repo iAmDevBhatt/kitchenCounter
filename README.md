@@ -113,8 +113,8 @@ KitchenCounter/
 │   │   └── api/index.js               # Axios, baseURL: '/api'
 │   └── vite.config.js                 # Proxy /api + /static → :8001
 ├── docker-compose.yml
-├── Dockerfile.backend
-├── Dockerfile.frontend
+├── Dockerfile                  # Single image: builds frontend, backend serves it + the API
+├── docker-entrypoint.sh
 ├── start.ps1 / stop.ps1        # Windows dev scripts
 ├── start.sh / init.sh          # Linux/Mac dev scripts
 ├── CLAUDE.md                   # Full technical reference for AI developers

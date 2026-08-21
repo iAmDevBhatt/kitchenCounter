@@ -1,0 +1,7 @@
+# Force LF line endings for files that run inside Linux containers.
+# core.autocrlf=true on Windows checkouts would otherwise convert these to
+# CRLF, which breaks the shebang line (`#!/bin/sh` + trailing \r) when
+# COPYed into the Docker image and executed as PID 1.
+docker-entrypoint.sh text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf

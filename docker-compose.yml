@@ -1,17 +1,18 @@
 version: '3.8'
 
 # ── How to use ────────────────────────────────────────────────────────────────
-#  Standalone (SQLite, default):
+#  Standalone (SQLite, default) — one image, frontend + backend in one container:
 #    cd /opt/blr-stack/KitchenCounter
 #    docker compose up --build -d
 #
 #  Merged into /opt/blr-stack/docker-compose.yml:
-#    Copy the `services:` and `volumes:` blocks into the parent file.
+#    Copy the `kitchencounter` service (and its named volumes, or point them at
+#    bind-mount paths as in your outer compose file) into the parent file.
 #    Make sure the shared network (blr-net) is declared in that file too.
-#    Set DATABASE_URL in backend's environment for your DB preference.
 #
-#  PostgreSQL:
+#  PostgreSQL (optional):
 #    docker compose --profile postgres up --build -d
+#    then set DATABASE_URL below to point at kitchencounter-db.
 # ─────────────────────────────────────────────────────────────────────────────
 
 networks:
@@ -40,47 +41,34 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Backend (FastAPI + SQLite by default) ─────────────────────────────────
-  kitchencounter-backend:
+  # ── KitchenCounter — single image: FastAPI backend + built React frontend ──
+  kitchencounter:
     build:
       context: .
-      dockerfile: Dockerfile.backend
-    container_name: kitchencounter-backend
+      dockerfile: Dockerfile
+    container_name: kitchencounter
     restart: unless-stopped
     environment:
       # SQLite (default — no extra services needed)
       DATABASE_URL: sqlite:////data/db/kitchendb.sqlite
       # Uncomment for PostgreSQL (use --profile postgres):
       # DATABASE_URL: postgresql+psycopg2://kitchenuser:kitchenpass@kitchencounter-db:5432/kitchendb
-      SECRET_KEY: change-me-in-production
+      # IMPORTANT: change this before deploying to production
+      SECRET_KEY: change-me-in-production-use-a-long-random-string
+      ACCESS_TOKEN_EXPIRE_MINUTES: "480"
+      SERVE_STATIC: "true"
+      PORT: "8000"
+      # Set both to a real host uid/gid to fix ownership on the bind-mounted
+      # volumes below; leave at 0/0 (or unset) to run as root.
+      PUID: "0"
+      PGID: "0"
     volumes:
       - uploads_data:/app/static/uploads   # item images — survives rebuilds
       - db_data:/data/db                   # SQLite DB — survives rebuilds
     networks:
       - blr-net
     ports:
-      - "8001:8001"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8001/ || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-
-  # ── Frontend (React SPA served by nginx) ──────────────────────────────────
-  kitchencounter-frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: kitchencounter-frontend
-    restart: unless-stopped
-    depends_on:
-      kitchencounter-backend:
-        condition: service_healthy
-    networks:
-      - blr-net
-    ports:
-      - "3080:80"    # Access at http://localhost:3080 (avoids port-80 conflicts)
+      - "8007:8000"    # Access at http://localhost:8007
 
 volumes:
   postgres_data:
