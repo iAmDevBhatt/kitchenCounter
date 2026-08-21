@@ -23,10 +23,36 @@ if [ "$PUID" != "0" ] && [ "$PGID" != "0" ]; then
     fi
     USER_NAME="$(getent passwd "$PUID" | cut -d: -f1)"
 
-    chown -R "$PUID:$PGID" /app/backend/static/uploads /data/db 2>/dev/null || true
+    if ! chown -R "$PUID:$PGID" /app/backend/static/uploads /data/db; then
+        echo "[entrypoint] WARNING: chown of /app/backend/static/uploads or /data/db failed —" >&2
+        echo "[entrypoint]          the container will likely fail to write to them as UID ${PUID}." >&2
+    fi
     RUN_AS="gosu ${USER_NAME}:${GROUP_NAME}"
 else
     echo "[entrypoint] PUID/PGID not set (or 0) — running as root"
+fi
+
+# Fail fast with a clear message instead of a deep SQLAlchemy traceback if the
+# DB's parent directory is missing or unwritable — usually means DATABASE_URL
+# doesn't agree with where a volume is actually mounted.
+db_dir=$(python -c "
+import os, re
+url = os.environ.get('DATABASE_URL', 'sqlite:///./kitchendb.sqlite')
+m = re.match(r'sqlite(\+\w+)?:////?(.*)', url)
+print(os.path.dirname('/' + m.group(2)) if m else '')
+")
+if [ -n "$db_dir" ]; then
+    if [ ! -d "$db_dir" ]; then
+        echo "[entrypoint] ERROR: DATABASE_URL points at a directory that doesn't exist in this" >&2
+        echo "[entrypoint]        container: '$db_dir'. Check that DATABASE_URL's path matches a" >&2
+        echo "[entrypoint]        volume/bind-mount target in docker-compose.yml." >&2
+        exit 1
+    fi
+    if [ -n "$RUN_AS" ] && ! $RUN_AS test -w "$db_dir"; then
+        echo "[entrypoint] ERROR: '$db_dir' exists but isn't writable by UID ${PUID}:${PGID}." >&2
+        echo "[entrypoint]        Check ownership of the host directory bind-mounted there." >&2
+        exit 1
+    fi
 fi
 
 # Run via `python -m` (not the bare `python backend/init_db.py` / `uvicorn`
