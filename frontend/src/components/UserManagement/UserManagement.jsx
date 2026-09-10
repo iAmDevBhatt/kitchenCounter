@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import apiClient from '../../api/index.js'
 
 export default function UserManagement() {
@@ -102,7 +102,7 @@ export default function UserManagement() {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={handleAdd} disabled={adding} className="btn-primary disabled:opacity-60">
-            {adding ? 'Adding…' : '+ Add User'}
+            {adding ? 'Addingâ€¦' : '+ Add User'}
           </button>
           {addError && <p className="text-red-600 text-xs">{addError}</p>}
         </div>
@@ -110,7 +110,7 @@ export default function UserManagement() {
 
       {/* User table */}
       {loading ? (
-        <div className="text-center py-8 text-stone-400 text-sm">Loading users…</div>
+        <div className="text-center py-8 text-stone-400 text-sm">Loading usersâ€¦</div>
       ) : error ? (
         <div className="text-center py-8 text-red-500 text-sm">{error}</div>
       ) : users.length === 0 ? (
@@ -147,14 +147,14 @@ export default function UserManagement() {
                       }
                     </td>
                     <td className="td text-stone-400 text-sm">
-                      {user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
+                      {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'â€”'}
                     </td>
                     <td className="td">
                       {isDeleting ? (
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-red-600">Delete "{user.username}"?</span>
-                          <button onClick={() => handleDelete(user.id)} className="btn-danger text-xs py-1 px-2">Yes</button>
-                          <button onClick={() => setDeleteId(null)} className="btn-secondary text-xs py-1 px-2">No</button>
+                          <button onClick={() => handleDelete(user.id)} className="btn-danger text-xs px-3 min-h-[36px]">Yes</button>
+                          <button onClick={() => setDeleteId(null)} className="btn-secondary text-xs px-3 min-h-[36px]">No</button>
                         </div>
                       ) : (
                         <div className="flex gap-1.5">
@@ -162,15 +162,15 @@ export default function UserManagement() {
                             onClick={() => handleToggle(user)}
                             disabled={toggling === user.id || isSelf}
                             title={isSelf ? "Can't deactivate yourself" : ''}
-                            className="btn-secondary text-xs py-1 px-2 disabled:opacity-40"
+                            className="btn-secondary text-xs px-3 min-h-[36px] disabled:opacity-40"
                           >
-                            {toggling === user.id ? '…' : user.is_active ? 'Deactivate' : 'Activate'}
+                            {toggling === user.id ? 'â€¦' : user.is_active ? 'Deactivate' : 'Activate'}
                           </button>
                           <button
                             onClick={() => setDeleteId(user.id)}
                             disabled={isSelf}
                             title={isSelf ? "Can't delete yourself" : ''}
-                            className="btn-danger text-xs py-1 px-2 disabled:opacity-40"
+                            className="btn-danger text-xs px-3 min-h-[36px] disabled:opacity-40"
                           >
                             Delete
                           </button>
@@ -187,3 +187,4 @@ export default function UserManagement() {
     </div>
   )
 }
+

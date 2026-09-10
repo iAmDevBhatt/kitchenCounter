@@ -1,6 +1,6 @@
 # KitchenCounter - AI Developer Reference
 
-> Last updated: 2026-08-19 (session 4). See `KITCHEN_APP_BUILD.md` §Implementation Status for full gap list.
+> Last updated: 2026-09-09 (session 7). See `KITCHEN_APP_BUILD.md` §Implementation Status for full gap list.
 
 This document provides comprehensive technical documentation for developers working on the KitchenCounter application.
 
@@ -36,10 +36,39 @@ KitchenCounter is a Progressive Web App (PWA) with:
 | Routing | react-router-dom v7 |
 | HTTP | Axios (`frontend/src/api/index.js`) with `baseURL: '/api'` |
 | State | Local `useState`/`useEffect` + React Context (`ThemeContext`) for global theme |
-| Drag & drop | Mouse-event system (NO HTML5 drag API) — `onMouseDown` + document-level `mousemove`/`mouseup`, 4px threshold, refs avoid stale closures |
+| Drag & drop | Mouse-event system (NO HTML5 drag API) — `onMouseDown`/`onTouchStart` + document-level `mousemove`/`mouseup`/`touchmove`/`touchend`, 4px threshold, refs avoid stale closures. Works on both mouse and touch (tablet/phone). |
 | Charts | Recharts 3.x (`recharts`, `react-is` peer dep) — used by DietStatsPage |
 | Bulk import/export | `xlsx` (SheetJS) + `papaparse` — installed in `frontend/` |
 | PWA | Not yet configured (`vite-plugin-pwa` not installed) |
+
+## Responsive Design & Touch Support
+
+The app is fully responsive — designed and tested for laptop, tablet, and mobile.
+
+### Touch Targets
+- The `.btn` base class in `index.css` enforces `min-h-[44px]` on all buttons, meeting touch-target accessibility guidelines.
+- Table row action buttons (Edit/Delete/Save/Cancel) use `min-h-[36px]` — slightly smaller since they sit in compact table rows, but intentionally tappable.
+- Modal close buttons are padded to at least 44×44 px.
+
+### Layout Breakpoints
+| Component | Mobile (< `md`) | Tablet/Desktop (`md`+) |
+|---|---|---|
+| `Layout` header | Logo icon only (text hidden), `gap-4` | Full "KitchenCounter" text, `gap-4 lg:gap-8` |
+| Mobile nav strip | `min-h-[44px]` touch links, horizontal scroll | Hidden (`md:hidden`) |
+| `MealPrepModal` body | Inventory panel on top (max-h-52, scrollable) + drop zones below | Side-by-side (`w-60` left + `flex-1` right) |
+| `DietStatsPage` MealStatusCharts | Single-column (`grid-cols-1`) | Two-column (`sm:grid-cols-2`) |
+| `AIInsightsPanel` | Full viewport width (`w-full`) | Fixed 320 px panel (`sm:w-80`) |
+
+### Hover vs Touch — CategoryTree Actions
+- Add / Rename / Delete buttons use `opacity-0 group-hover:opacity-100` on pointer devices.
+- On touch devices (`@media (hover: none)`), the same buttons are always visible via `[@media(hover:none)]:opacity-100`.
+
+### Drag & Drop — Touch Support (KitchenSlabPage `MealPrepModal`)
+The drag system supports both mouse and touch:
+- `onMouseDown` / `onTouchStart` on each inventory row seed `pendingRef`.
+- Document-level `mousemove` + `touchmove` (passive: false) activate drag after 4 px threshold; update ghost position; hit-test `[data-dropzone]` via `elementFromPoint`.
+- `mouseup` + `touchend` commit the dragged item to the targeted meal slot.
+- `touchmove` calls `e.preventDefault()` to block page scroll during a drag.
 
 ## Vite Proxy Configuration
 
@@ -54,6 +83,24 @@ proxy: {
   '/static': { target: 'http://127.0.0.1:8001', changeOrigin: true },
 }
 ```
+
+## Favicon / App Icon
+
+`frontend/public/favicon.svg` — orange circle background, black frying pan, fried egg (white + amber yolk). Shown in browser tabs, bookmarks, and iOS home screen saves.
+
+**How it works end-to-end (Docker):**
+- Vite copies everything in `frontend/public/` into `dist/` at build time — no Dockerfile change needed.
+- `index.html` references it via `<link rel="icon" type="image/svg+xml" href="/favicon.svg">` and `<link rel="apple-touch-icon" href="/favicon.svg">`.
+- In production (single container), `backend/main.py`'s SPA catch-all route checks whether the requested path is a real file in `frontend_dist/` before falling back to `index.html`. This prevents `/favicon.svg` from being swallowed by the catch-all and returning the SPA shell instead of the icon.
+
+**`main.py` root-file serving logic (inside the `SERVE_STATIC` block):**
+```python
+candidate = _frontend_dist / full_path
+if candidate.is_file() and candidate.parent == _frontend_dist:
+    return FileResponse(str(candidate), media_type=_MIME.get(candidate.suffix, ...))
+return FileResponse(str(_frontend_dist / "index.html"))  # SPA fallback
+```
+The `candidate.parent == _frontend_dist` guard ensures only files directly in `dist/` are served this way — subdirectory traversal is not possible.
 
 ## Known Issues / Gaps
 
@@ -125,7 +172,7 @@ KitchenCounter/
 │   │   │   └── AIInsightsPanel/
 │   │   ├── pages/
 │   │   │   ├── LoginPage.jsx
-│   │   │   ├── InventoryPage.jsx      # Tabs: All Items → In Stock (Stocked+InUse) → Running Low → Out of Stock
+│   │   │   ├── InventoryPage.jsx      # Tabs: All Items → In Stock (Stocked+InUse) → Running Low → Out of Stock. "Add Item" button is in the table card header (above the table), not the page header.
 │   │   │   ├── KitchenSlabPage.jsx    # Real inventory data; 4 filters; pointer-based drag to meal prep modal
 │   │   │   ├── DietStatsPage.jsx      # Dietary stats + usage trend charts (3 chart components, fixed year picker)
 │   │   │   ├── ConfigurationPage.jsx  # Tabs: Categories | Tags | Users
@@ -346,12 +393,13 @@ Theme state is managed by `ThemeContext` (`frontend/src/context/ThemeContext.jsx
 
 ## Kitchen Slab — Drag-and-Drop Architecture
 
-HTML5 drag API is broken inside `overflow: auto/scroll` ancestors (Chrome/Safari — `dataTransfer.getData()` returns empty string). The drag system uses mouse events instead:
+HTML5 drag API is broken inside `overflow: auto/scroll` ancestors (Chrome/Safari — `dataTransfer.getData()` returns empty string). The drag system uses pointer events (mouse + touch) instead:
 
-- `onMouseDown` on inventory row items sets `pendingRef` (no `preventDefault`, preserving clicks)
-- Single `useEffect([], [])` adds document-level `mousemove` / `mouseup` listeners; refs (`draggingRef`, `activeRef`) provide stale-closure-free access to state
-- `mousemove` activates drag after 4px threshold; updates floating ghost position; hides ghost → `elementFromPoint` → find `[data-dropzone]` ancestor → set `activeOver`
-- `mouseup` reads refs, commits item to the targeted meal slot, resets all state
+- `onMouseDown` / `onTouchStart` on inventory row items seeds `pendingRef` with the item and start coordinates
+- Single `useEffect([], [])` adds document-level `mousemove`+`mouseup` and `touchmove`+`touchend` listeners; refs (`draggingRef`, `activeRef`) provide stale-closure-free access to state
+- `handleMove(cx, cy)` shared by both mouse and touch paths: activates drag after 4px threshold; updates floating ghost; hides ghost → `elementFromPoint` → find `[data-dropzone]` ancestor → set `activeOver`
+- `touchmove` registered with `{ passive: false }` so `e.preventDefault()` can suppress page scroll during a drag
+- `handleUp()` shared by `mouseup` and `touchend`: reads refs, commits item to targeted meal slot, resets all state
 - Drop targets: `<div data-dropzone={mealName}>` — highlights when `activeOver === mealName`
 - Floating ghost: `position: fixed; z-index: 100; pointer-events: none`
 

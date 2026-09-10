@@ -27,17 +27,9 @@ export default function InventoryPage() {
   return (
     <Layout>
       {/* Page header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="page-title">{getLabel('page.inventory.title')}</h1>
-          <p className="page-subtitle">Manage your kitchen stock and usage</p>
-        </div>
-        <button className="btn-primary" onClick={() => setShowAdd(true)}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          {getLabel('btn.add.item')}
-        </button>
+      <div className="mb-6">
+        <h1 className="page-title">{getLabel('page.inventory.title')}</h1>
+        <p className="page-subtitle">Manage your kitchen stock and usage</p>
       </div>
 
       {/* Stat cards */}
@@ -71,6 +63,12 @@ export default function InventoryPage() {
             <span className={tab.color}>{tab.icon}</span>
             {tab.key === 'all' ? 'All Items' : getLabel(tab.label)}
           </h2>
+          <button className="btn-primary" onClick={() => setShowAdd(true)}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            {getLabel('btn.add.item')}
+          </button>
         </div>
         <div className="p-4">
           <InventoryTable

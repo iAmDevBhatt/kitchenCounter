@@ -7,7 +7,7 @@
 
 ---
 
-## Implementation Status (last updated 2026-08-19)
+## Implementation Status (last updated 2026-09-09 session 7)
 
 ### ✅ Completed
 - All database models (SQLAlchemy `UUID(as_uuid=False)`), schemas (`str` UUIDs), and CRUD routers
@@ -32,13 +32,30 @@
 - `labels.properties` i18n system with `useLabels` hook
 - `start.ps1` / `stop.ps1` scripts (Windows, port 8001)
 - `seed_data.py` with admin user + KitchenCategories root node
-- **KitchenSlabPage**: replaced mock inventory data with real API data (`GET /inventory/` + `GET /categories/`); 4 filters (name, category, status, qty≤); scrollable table; pointer-based drag-and-drop (HTML5 drag API abandoned — broken in Chrome/Safari inside `overflow:scroll` ancestors); drag system uses mouse events, 4px threshold, document-level listeners via `useEffect`, refs for stale-closure avoidance, `elementFromPoint` + `[data-dropzone]` for hit testing
+- **KitchenSlabPage**: replaced mock inventory data with real API data (`GET /inventory/` + `GET /categories/`); 4 filters (name, category, status, qty≤); scrollable table; pointer-based drag-and-drop (HTML5 drag API abandoned — broken in Chrome/Safari inside `overflow:scroll` ancestors); drag system uses mouse **and touch** events (`onMouseDown`/`onTouchStart`, `mousemove`/`touchmove`, `mouseup`/`touchend`), 4px threshold, document-level listeners via `useEffect`, refs for stale-closure avoidance, `elementFromPoint` + `[data-dropzone]` for hit testing — works on tablet and mobile
 - **DietStatsPage**: fixed `YEARS` array (was showing only future years); added `GET /stats/usage-trend` data fetch; added 3 new chart components: `UsageTrendChart` (stacked bar, top 10 items over 6 months), `CategoryUsagePie` (donut pie, category intensity), `MonthlyVolumeLine` (line chart, total item appearances per month)
 - **`GET /stats/usage-trend`** endpoint (`backend/routers/stats.py`): rolling 6-month window, no params, returns `months`/`top_items`/`category_totals`/`monthly_totals` — designed for AI/MCP tool calling
 - Tailwind CSS v3 + PostCSS; warm earthy UI (orange/amber, Inter font, card-based)
 - Docker: `docker-compose.yml` with named volumes for SQLite DB (`db_data`) and uploads (`uploads_data`); PostgreSQL opt-in via `--profile postgres`; data survives `docker compose up --build`
 - **Session 5 (2026-08-21):** Consolidated `Dockerfile.backend` + `Dockerfile.frontend` + nginx into a single root `Dockerfile` (multi-stage: builds the frontend, then the FastAPI backend serves the built static files directly — see CLAUDE.md §Docker Deployment). Fixed an image-upload path bug (`routers/inventory.py` was writing outside the mounted volume under Docker) and a missing-env-var crash risk (`config.py` `upload_dir` had no default). §3 and §11.2 below still describe the original two-Dockerfile/nginx design — kept for history, superseded by CLAUDE.md.
 - **Session 5 follow-up (first real deploy):** First actual container run surfaced `ImportError: attempted relative import beyond top-level package` from `init_db.py` — the original Dockerfiles (`Dockerfile.backend` included) flattened `backend/`'s contents directly into `/app`, which breaks the `from ..database import ...`-style relative imports used throughout `backend/models`, `backend/routers`, etc. (this bug predates the single-Dockerfile consolidation; it was apparently never caught because the container had never been successfully run before). Fixed by copying `backend/` into `/app/backend/` (nested, matching local dev's `backend.main:app` package layout) and running `init_db`/`uvicorn` via `python -m backend.init_db` / `python -m uvicorn backend.main:app` so `/app` lands on `sys.path`. Also rewrote `init_db.py` to import via `backend.database`/`backend.models` (was inserting its own directory onto `sys.path` and importing bare `database`/`models`, which independently caused the same error). See CLAUDE.md §Docker Deployment for the full explanation.
+
+- **Session 6 (2026-09-09) — Responsive design & touch support across all pages:**
+  - `index.css` `.btn` base: added `min-h-[44px]` so every button meets touch-target guidelines
+  - `Layout.jsx`: tightened header gap, hide brand text on `< sm`, `min-h-[44px]` on mobile nav links
+  - `KitchenSlabPage` `MealPrepModal`: body now `flex-col` on mobile / `flex-row md+`; inventory panel becomes a capped scrollable strip above drop zones on phones
+  - `KitchenSlabPage` drag system: added `onTouchStart` / `touchmove` (passive:false) / `touchend` handlers alongside existing mouse events — drag-to-meal-slot now works on tablets and phones
+  - `CategoryTree`: action buttons use `[@media(hover:none)]:opacity-100` — always visible on touch devices; hint text updated
+  - `DietStatsPage` `MealStatusCharts`: `grid-cols-2` → `grid-cols-1 sm:grid-cols-2`; pie labels moved from outside-radius text to `<Legend>` to avoid clipping on small screens
+  - `AIInsightsPanel`: `w-80` → `w-full sm:w-80`; close button padded to 44×44 px; tool buttons `min-h-[44px]`
+  - Table row action buttons (InventoryTable, TagManager, UserManagement, StorageLocationManager, KitchenSlabPage): `py-1 px-2` → `min-h-[36px] px-3`
+  - `InventoryTable` modal close `✕`: padded to 44×44 px
+
+- **Session 7 (2026-09-09) — Favicon & UX polish:**
+  - `frontend/public/favicon.svg`: custom SVG icon — orange circle, black frying pan, fried egg (white + amber yolk). Shown in browser tabs, bookmarks, and iOS home screen saves.
+  - `frontend/index.html`: `rel="icon"` and `rel="apple-touch-icon"` both point to `/favicon.svg` (replaces default Vite logo).
+  - `backend/main.py` SPA catch-all updated: checks if `full_path` resolves to a real file directly in `frontend_dist/` before returning `index.html` — prevents the catch-all from swallowing `/favicon.svg` and other root-level public assets in Docker. `candidate.parent == _frontend_dist` guard prevents directory traversal.
+  - `InventoryPage.jsx`: moved "Add Item" button from the page header (top-right, out of sight) into the table card header bar (right-aligned, above the table) — matches natural reading flow: title → stat cards → tabs → [Tab name … Add Item] → table.
 
 ### ⚠️ Deviations from spec / known issues
 - **Database:** SQLite used for dev AND optionally production (intentional user decision). PostgreSQL available via Docker profile. Alembic not configured — `Base.metadata.create_all()` handles schema.

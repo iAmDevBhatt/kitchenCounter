@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import apiClient from '../../api/index.js'
 
 const TYPE_OPTIONS = ['general', 'vitamin', 'mineral', 'allergen', 'diet']
@@ -105,7 +105,7 @@ export default function TagManager() {
             {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
           </select>
           <button onClick={handleAdd} disabled={adding} className="btn-primary whitespace-nowrap disabled:opacity-60">
-            {adding ? 'Adding…' : '+ Add Tag'}
+            {adding ? 'Addingâ€¦' : '+ Add Tag'}
           </button>
         </div>
         {addError && <p className="text-red-600 text-xs mt-2">{addError}</p>}
@@ -113,7 +113,7 @@ export default function TagManager() {
 
       {/* Tag list */}
       {loading ? (
-        <div className="text-center py-8 text-stone-400 text-sm">Loading tags…</div>
+        <div className="text-center py-8 text-stone-400 text-sm">Loading tagsâ€¦</div>
       ) : error ? (
         <div className="text-center py-8 text-red-500 text-sm">{error}</div>
       ) : tags.length === 0 ? (
@@ -159,20 +159,20 @@ export default function TagManager() {
                     {editId === tag.id ? (
                       <div className="flex gap-1.5">
                         <button onClick={handleSaveEdit} disabled={saving} className="btn-primary text-xs py-1 px-2 disabled:opacity-60">
-                          {saving ? '…' : 'Save'}
+                          {saving ? 'â€¦' : 'Save'}
                         </button>
-                        <button onClick={() => setEditId(null)} className="btn-secondary text-xs py-1 px-2">Cancel</button>
+                        <button onClick={() => setEditId(null)} className="btn-secondary text-xs px-3 min-h-[36px]">Cancel</button>
                       </div>
                     ) : deleteId === tag.id ? (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-red-600">Delete "{tag.name}"?</span>
-                        <button onClick={() => handleDelete(tag.id)} className="btn-danger text-xs py-1 px-2">Yes</button>
-                        <button onClick={() => setDeleteId(null)} className="btn-secondary text-xs py-1 px-2">No</button>
+                        <button onClick={() => handleDelete(tag.id)} className="btn-danger text-xs px-3 min-h-[36px]">Yes</button>
+                        <button onClick={() => setDeleteId(null)} className="btn-secondary text-xs px-3 min-h-[36px]">No</button>
                       </div>
                     ) : (
                       <div className="flex gap-1.5">
-                        <button onClick={() => startEdit(tag)} className="btn-secondary text-xs py-1 px-2">Edit</button>
-                        <button onClick={() => setDeleteId(tag.id)} className="btn-danger text-xs py-1 px-2">Delete</button>
+                        <button onClick={() => startEdit(tag)} className="btn-secondary text-xs px-3 min-h-[36px]">Edit</button>
+                        <button onClick={() => setDeleteId(tag.id)} className="btn-danger text-xs px-3 min-h-[36px]">Delete</button>
                       </div>
                     )}
                   </td>
@@ -185,3 +185,4 @@ export default function TagManager() {
     </div>
   )
 }
+

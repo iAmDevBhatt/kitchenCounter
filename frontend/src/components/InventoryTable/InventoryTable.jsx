@@ -309,7 +309,7 @@ function ItemModal({ item, categories, locations, onSave, onClose }) {
           <h3 className="text-lg font-semibold text-stone-800">
             {isEdit ? `Edit — ${item.item_name}` : 'Add Inventory Item'}
           </h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-600 text-xl leading-none">✕</button>
+          <button onClick={onClose} className="w-11 h-11 flex items-center justify-center rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 text-xl transition-colors">✕</button>
         </div>
 
         {/* Tab bar */}
@@ -826,8 +826,8 @@ export default function InventoryTable({ statusFilter, showAllFilters, onStatsCh
                   <td className={`td text-sm ${exp.cls}`}>{exp.label}</td>
                   <td className="td">
                     <div className="flex gap-1.5">
-                      <button onClick={() => setEditItem(item)} className="btn-secondary text-xs py-1 px-2">Edit</button>
-                      <button onClick={() => setDeleteItem(item)} className="btn-danger text-xs py-1 px-2">Delete</button>
+                      <button onClick={() => setEditItem(item)} className="btn-secondary text-xs px-3 min-h-[36px]">Edit</button>
+                      <button onClick={() => setDeleteItem(item)} className="btn-danger text-xs px-3 min-h-[36px]">Delete</button>
                     </div>
                   </td>
                 </tr>

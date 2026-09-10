@@ -38,12 +38,12 @@ const AIInsightsPanel = () => {
   ]
 
   return (
-    <div className="fixed top-16 right-0 h-full w-80 bg-white shadow-lg border-l z-50 transform transition-transform duration-300 ease-in-out">
+    <div className="fixed top-16 right-0 h-[calc(100%-4rem)] w-full sm:w-80 bg-white shadow-lg border-l z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto">
       <div className="p-4 border-b flex justify-between items-center">
         <h2 className="text-xl font-semibold">AI Insights</h2>
-        <button 
+        <button
           onClick={() => setIsExpanded(false)}
-          className="text-gray-500 hover:text-gray-700"
+          className="w-11 h-11 flex items-center justify-center text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
         >
           ✕
         </button>
@@ -57,7 +57,7 @@ const AIInsightsPanel = () => {
               <button
                 key={tool.name}
                 onClick={() => fetchInsights(tool.name)}
-                className="p-2 bg-blue-50 hover:bg-blue-100 rounded text-sm text-center"
+                className="p-3 min-h-[44px] bg-blue-50 hover:bg-blue-100 rounded text-sm text-center"
               >
                 {tool.label}
               </button>

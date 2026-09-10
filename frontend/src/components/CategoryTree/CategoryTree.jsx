@@ -89,11 +89,11 @@ function CategoryNode({ node, depth, allFlat, onAdd, onEdit, onDelete, isRoot })
           </span>
         )}
 
-        {/* action buttons — appear on hover */}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1">
+        {/* action buttons — hover on pointer devices, always visible on touch devices */}
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity shrink-0 ml-1">
           <button
             onClick={() => onAdd(node)}
-            className="text-xs px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
+            className="text-xs px-2 min-h-[36px] rounded-md bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
             title={`Add child under "${node.name}"`}
           >
             + Add
@@ -102,14 +102,14 @@ function CategoryNode({ node, depth, allFlat, onAdd, onEdit, onDelete, isRoot })
             <>
               <button
                 onClick={() => onEdit(node)}
-                className="text-xs px-2 py-0.5 rounded-md bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
+                className="text-xs px-2 min-h-[36px] rounded-md bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors"
                 title="Rename"
               >
                 ✏️
               </button>
               <button
                 onClick={() => onDelete(node)}
-                className="text-xs px-2 py-0.5 rounded-md bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                className="text-xs px-2 min-h-[36px] rounded-md bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
                 title="Delete"
               >
                 🗑
@@ -352,7 +352,7 @@ export default function CategoryTree() {
         <div>
           <h2 className="text-base font-semibold text-stone-800">🗂️ Category Tree</h2>
           <p className="text-xs text-stone-400 mt-0.5">
-            Hover over any category to add / rename / delete it
+            Tap or hover a category to add / rename / delete it
           </p>
         </div>
         <button onClick={load} className="btn-ghost text-xs gap-1">

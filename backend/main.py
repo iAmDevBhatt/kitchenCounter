@@ -81,12 +81,24 @@ _frontend_dist = Path(__file__).resolve().parent / "frontend_dist"
 if _serve_static and _frontend_dist.is_dir():
     app.mount("/assets", StaticFiles(directory=str(_frontend_dist / "assets")), name="frontend-assets")
 
+    _MIME = {
+        ".svg":  "image/svg+xml",
+        ".ico":  "image/x-icon",
+        ".png":  "image/png",
+        ".json": "application/json",
+        ".webmanifest": "application/manifest+json",
+    }
+
     @app.get("/", include_in_schema=False)
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_frontend(full_path: str = ""):
-        # Routers above (/auth, /categories, /static, ...) and the /assets
-        # mount already claimed their paths, so anything reaching here is a
-        # client-side (react-router) route — hand back the SPA shell.
+        # Serve root-level public files (favicon.svg, manifest, etc.) that
+        # Vite copies into dist/ — must be checked before falling back to
+        # index.html, otherwise the SPA shell is returned for every asset.
+        candidate = _frontend_dist / full_path
+        if candidate.is_file() and candidate.parent == _frontend_dist:
+            return FileResponse(str(candidate), media_type=_MIME.get(candidate.suffix, "application/octet-stream"))
+        # Everything else is a client-side react-router route — return the SPA shell.
         return FileResponse(str(_frontend_dist / "index.html"))
 else:
     @app.get("/")

@@ -140,12 +140,10 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
 
   // Document-level listeners — mounted once, read state via refs
   useEffect(() => {
-    const onMove = (e) => {
-      const cx = e.clientX
-      const cy = e.clientY
+    const handleMove = (cx, cy) => {
       if (!pendingRef.current && !draggingRef.current) return
 
-      // Activate drag once cursor moves > 4px from mousedown point
+      // Activate drag once pointer moves > 4px from start point
       if (pendingRef.current && !draggingRef.current) {
         const dx = cx - pendingRef.current.startX
         const dy = cy - pendingRef.current.startY
@@ -169,7 +167,7 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
       setActiveOver(zoneName)
     }
 
-    const onUp = () => {
+    const handleUp = () => {
       const d = draggingRef.current
       const a = activeRef.current
       if (d && a) {
@@ -186,11 +184,26 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
       setActiveOver(null)
     }
 
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup',   onUp)
+    const onMouseMove = (e) => handleMove(e.clientX, e.clientY)
+    const onMouseUp   = () => handleUp()
+
+    const onTouchMove = (e) => {
+      if (!pendingRef.current && !draggingRef.current) return
+      e.preventDefault()  // prevent page scroll while dragging
+      const t = e.touches[0]
+      handleMove(t.clientX, t.clientY)
+    }
+    const onTouchEnd = () => handleUp()
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup',   onMouseUp)
+    document.addEventListener('touchmove', onTouchMove, { passive: false })
+    document.addEventListener('touchend',  onTouchEnd)
     return () => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup',   onUp)
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup',   onMouseUp)
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend',  onTouchEnd)
     }
   }, [])  // mount once — reads state via refs, never stale
 
@@ -198,6 +211,12 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
     if (e.button !== 0) return  // left button only
     pendingRef.current = { item, startX: e.clientX, startY: e.clientY }
     // No preventDefault — clicks, inputs, selects all work normally
+  }
+
+  const onItemTouchStart = (e, item) => {
+    const t = e.touches[0]
+    pendingRef.current = { item, startX: t.clientX, startY: t.clientY }
+    // No preventDefault here — allows tap/scroll until drag threshold is crossed
   }
 
   const handleSave = () => {
@@ -216,17 +235,17 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
           <h2 className="text-lg font-semibold text-stone-800">
             {row ? `Edit Day ${row.day}` : 'Add Meal Plan'}
           </h2>
-          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">
+          <button onClick={onClose} className="btn-ghost p-2 rounded-lg min-h-[44px] min-w-[44px] justify-center">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
             </svg>
           </button>
         </div>
 
-        {/* body */}
-        <div className="flex flex-1 min-h-0">
-          {/* LEFT: inventory list */}
-          <div className="w-60 shrink-0 border-r border-orange-100 p-4 flex flex-col gap-3 overflow-y-auto">
+        {/* body — stacks vertically on mobile, side-by-side on md+ */}
+        <div className="flex flex-col md:flex-row flex-1 min-h-0">
+          {/* TOP (mobile) / LEFT (desktop): inventory list */}
+          <div className="md:w-60 md:shrink-0 border-b md:border-b-0 md:border-r border-orange-100 p-4 flex flex-col gap-3 overflow-y-auto md:max-h-none max-h-52">
             <div>
               <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">Inventory</p>
               <p className="text-xs text-stone-400 mb-2">Drag items into a meal →</p>
@@ -242,6 +261,7 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
                   <div
                     key={item.id}
                     onMouseDown={e => onItemMouseDown(e, payload)}
+                    onTouchStart={e => onItemTouchStart(e, payload)}
                     className={`flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-2 cursor-grab hover:bg-orange-100 transition-colors select-none
                       ${isDragging ? 'opacity-40' : ''}`}
                   >
@@ -581,10 +601,10 @@ export default function KitchenSlabPage() {
                           <div className="flex gap-1.5 flex-col">
                             <button
                               onClick={() => setModalRow(row)}
-                              className="btn-secondary text-xs py-1 px-2">Edit</button>
+                              className="btn-secondary text-xs px-3 min-h-[36px]">Edit</button>
                             <button
                               onClick={() => setDeleteRow(row)}
-                              className="btn-danger text-xs py-1 px-2">Delete</button>
+                              className="btn-danger text-xs px-3 min-h-[36px]">Delete</button>
                           </div>
                         </td>
                       </tr>

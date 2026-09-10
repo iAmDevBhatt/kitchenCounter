@@ -41,11 +41,11 @@ export default function Layout({ children }) {
 
       {/* Top nav */}
       <header className="bg-white/90 backdrop-blur border-b border-orange-100 shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link to="/inventory" className="flex items-center gap-2 font-bold text-xl text-orange-700 hover:text-orange-800 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 lg:gap-8 min-w-0">
+            <Link to="/inventory" className="flex items-center gap-2 font-bold text-xl text-orange-700 hover:text-orange-800 transition-colors shrink-0">
               <span className="text-2xl">🍳</span>
-              <span>KitchenCounter</span>
+              <span className="hidden sm:inline">KitchenCounter</span>
             </Link>
             <nav className="hidden md:flex items-center gap-1">
               {NAV.map(({ to, icon, label }) => {
@@ -80,15 +80,15 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* Mobile nav */}
-      <nav className="md:hidden bg-white/90 backdrop-blur border-b border-orange-100 px-4 py-2 flex gap-1 overflow-x-auto relative z-40">
+      {/* Mobile nav — horizontally scrollable strip; min-h-[44px] for touch targets */}
+      <nav className="md:hidden bg-white/90 backdrop-blur border-b border-orange-100 px-2 py-1 flex gap-1 overflow-x-auto relative z-40 scrollbar-hide">
         {NAV.map(({ to, icon, label }) => {
           const active = location.pathname === to
           return (
             <Link
               key={to}
               to={to}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all
+              className={`flex items-center gap-1.5 px-3 min-h-[44px] rounded-lg text-xs font-medium whitespace-nowrap transition-all shrink-0
                 ${active ? 'bg-orange-100 text-orange-700' : 'text-stone-600 hover:bg-orange-50'}`}
             >
               <span>{icon}</span>

@@ -112,26 +112,28 @@ function MealStatusCharts({ mealTime, statusBreakdown }) {
   const mtData = mealTime.map(m => ({ name: m.meal_time, value: m.count }))
   const stData = statusBreakdown.map(s => ({ name: s.status, value: s.count }))
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <p className="text-xs font-medium text-stone-600 mb-2">By Meal Time</p>
-        <ResponsiveContainer width="100%" height={180}>
+        <ResponsiveContainer width="100%" height={200}>
           <PieChart>
-            <Pie data={mtData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}>
+            <Pie data={mtData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70}>
               {mtData.map((e) => <Cell key={e.name} fill={MEAL_COLORS[e.name] ?? '#f97316'} />)}
             </Pie>
             <Tooltip />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
           </PieChart>
         </ResponsiveContainer>
       </div>
       <div>
         <p className="text-xs font-medium text-stone-600 mb-2">Entry Status</p>
-        <ResponsiveContainer width="100%" height={180}>
+        <ResponsiveContainer width="100%" height={200}>
           <PieChart>
-            <Pie data={stData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}>
+            <Pie data={stData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70}>
               {stData.map((e) => <Cell key={e.name} fill={STATUS_COLORS[e.name] ?? '#94a3b8'} />)}
             </Pie>
             <Tooltip />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -322,7 +324,7 @@ export default function DietStatsPage() {
           >
             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          <button onClick={load} className="btn-primary text-sm py-1.5 px-4">Refresh</button>
+          <button onClick={load} className="btn-primary text-sm px-4">Refresh</button>
         </div>
       </div>
 

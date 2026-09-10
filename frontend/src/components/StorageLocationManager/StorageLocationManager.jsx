@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import apiClient from '../../api/index.js'
 
 export default function StorageLocationManager() {
@@ -70,7 +70,7 @@ export default function StorageLocationManager() {
     <div>
       <h2 className="text-xl font-semibold text-stone-800 mb-1">Storage Locations</h2>
       <p className="text-sm text-stone-500 mb-5">
-        Define where items are stored — e.g. Fridge, Freezer, Pantry, Spice Rack.
+        Define where items are stored â€” e.g. Fridge, Freezer, Pantry, Spice Rack.
         These appear in the "Stored Location" dropdown when adding or editing inventory items.
       </p>
 
@@ -80,13 +80,13 @@ export default function StorageLocationManager() {
         <div className="flex gap-2">
           <input
             className="input flex-1"
-            placeholder="e.g. Fridge, Freezer, Pantry…"
+            placeholder="e.g. Fridge, Freezer, Pantryâ€¦"
             value={newName}
             onChange={e => { setNewName(e.target.value); setAddError('') }}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
           />
           <button onClick={handleAdd} disabled={adding} className="btn-primary whitespace-nowrap disabled:opacity-60">
-            {adding ? 'Adding…' : '+ Add'}
+            {adding ? 'Addingâ€¦' : '+ Add'}
           </button>
         </div>
         {addError && <p className="text-red-600 text-xs mt-2">{addError}</p>}
@@ -94,7 +94,7 @@ export default function StorageLocationManager() {
 
       {/* List */}
       {loading ? (
-        <div className="text-center py-8 text-stone-400 text-sm">Loading…</div>
+        <div className="text-center py-8 text-stone-400 text-sm">Loadingâ€¦</div>
       ) : error ? (
         <div className="text-center py-8 text-red-500 text-sm">{error}</div>
       ) : locations.length === 0 ? (
@@ -130,20 +130,20 @@ export default function StorageLocationManager() {
                     {editId === loc.id ? (
                       <div className="flex gap-1.5">
                         <button onClick={handleSaveEdit} disabled={saving} className="btn-primary text-xs py-1 px-2 disabled:opacity-60">
-                          {saving ? '…' : 'Save'}
+                          {saving ? 'â€¦' : 'Save'}
                         </button>
-                        <button onClick={() => setEditId(null)} className="btn-secondary text-xs py-1 px-2">Cancel</button>
+                        <button onClick={() => setEditId(null)} className="btn-secondary text-xs px-3 min-h-[36px]">Cancel</button>
                       </div>
                     ) : deleteId === loc.id ? (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-red-600">Delete "{loc.name}"?</span>
-                        <button onClick={() => handleDelete(loc.id)} className="btn-danger text-xs py-1 px-2">Yes</button>
-                        <button onClick={() => setDeleteId(null)} className="btn-secondary text-xs py-1 px-2">No</button>
+                        <button onClick={() => handleDelete(loc.id)} className="btn-danger text-xs px-3 min-h-[36px]">Yes</button>
+                        <button onClick={() => setDeleteId(null)} className="btn-secondary text-xs px-3 min-h-[36px]">No</button>
                       </div>
                     ) : (
                       <div className="flex gap-1.5">
-                        <button onClick={() => { setEditId(loc.id); setEditName(loc.name) }} className="btn-secondary text-xs py-1 px-2">Edit</button>
-                        <button onClick={() => setDeleteId(loc.id)} className="btn-danger text-xs py-1 px-2">Delete</button>
+                        <button onClick={() => { setEditId(loc.id); setEditName(loc.name) }} className="btn-secondary text-xs px-3 min-h-[36px]">Edit</button>
+                        <button onClick={() => setDeleteId(loc.id)} className="btn-danger text-xs px-3 min-h-[36px]">Delete</button>
                       </div>
                     )}
                   </td>
@@ -156,3 +156,4 @@ export default function StorageLocationManager() {
     </div>
   )
 }
+
