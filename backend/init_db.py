@@ -1,10 +1,10 @@
 """
-Startup initializer: create all tables then seed default data.
-Run automatically by the Docker entrypoint before uvicorn starts
-(`python -m backend.init_db`, so this module loads as `backend.init_db` —
-required by the `from ..database import ...`-style relative imports used
-throughout backend/models, backend/routers, etc.). Mirrors the import style
-already used by seed_data.py for local dev.
+Startup seed: inserts default data (admin user, root category) if absent.
+
+In Docker, this runs AFTER `alembic upgrade head` has already applied all
+schema migrations, so there is no create_all() call here.  For local dev
+(`python -m backend.init_db` without Docker), create_all() still runs as a
+convenience fallback so developers don't need to run Alembic manually.
 """
 from __future__ import annotations
 import os, uuid, sys
@@ -28,9 +28,16 @@ from passlib.context import CryptContext
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Whether we are running inside Docker (entrypoint sets this after alembic runs)
+_IN_DOCKER = os.environ.get("RUNNING_IN_DOCKER", "").lower() in ("1", "true", "yes")
+
 
 def seed():
-    Base.metadata.create_all(bind=engine)
+    # Local dev fallback: create tables if Alembic hasn't been run yet.
+    # In Docker, alembic upgrade head already ran, so this is a no-op (create_all
+    # only creates tables that don't exist yet — it never drops or alters them).
+    if not _IN_DOCKER:
+        Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
     try:

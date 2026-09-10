@@ -7,7 +7,7 @@
 
 ---
 
-## Implementation Status (last updated 2026-09-09 session 7)
+## Implementation Status (last updated 2026-09-10 session 9)
 
 ### ✅ Completed
 - All database models (SQLAlchemy `UUID(as_uuid=False)`), schemas (`str` UUIDs), and CRUD routers
@@ -57,8 +57,28 @@
   - `backend/main.py` SPA catch-all updated: checks if `full_path` resolves to a real file directly in `frontend_dist/` before returning `index.html` — prevents the catch-all from swallowing `/favicon.svg` and other root-level public assets in Docker. `candidate.parent == _frontend_dist` guard prevents directory traversal.
   - `InventoryPage.jsx`: moved "Add Item" button from the page header (top-right, out of sight) into the table card header bar (right-aligned, above the table) — matches natural reading flow: title → stat cards → tabs → [Tab name … Add Item] → table.
 
+- **Session 8 (2026-09-10) — Monthly Meal Plan UX overhaul + video embed:**
+  - Replaced the cramped meal-plan table with a **day-card grid** (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`). Each `DayCard` shows the day number, 🎬/🛒 indicators, per-meal status badges + truncated ingredient preview, and View/Edit/Delete actions.
+  - Added `DayDetail` slide-over (`w-full sm:w-[420px]`, right-anchored, backdrop-dismissable): shows each meal's full ingredient list (with stock status chips), notes, and inline video player. Edit/Delete wired through to existing modal and confirm dialog.
+  - `saveRow` now refreshes `viewRow` state if the saved day matches the open slide-over — no stale data after editing.
+  - Added `embedUrl(url)` helper returning `{ src, allow }` for embeddable URLs:
+    - YouTube: all variants (`watch?v=`, `youtu.be/`, `/shorts/`, `/live/`, `/embed/`, `m.youtube.com/`)
+    - Instagram: `/reel/`, `/p/`, `/tv/`
+    - Facebook: `facebook.com/.../videos/ID`, `fb.watch/ID` (via `facebook.com/plugins/video.php`)
+    - Unknown platforms → `null` → external "Open video link" in a new tab
+  - Video renders as `16:9 aspect-video` iframe inside the slide-over. Placeholder text in edit modal updated to "YouTube / Instagram / Facebook…".
+  - `InventoryPage`: camera capture support added to `ImageUpload` — touch devices get "Take photo" (`capture="environment"`) + "Choose photo" buttons; drag-drop zone unchanged for desktop.
+
+- **Session 9 (2026-09-10) — Safe production schema migrations via Alembic:**
+  - `migrations/env.py` rewritten: imports `Base` + all models, overrides `sqlalchemy.url` from `DATABASE_URL` env var, adds `render_as_batch=True` for SQLite compatibility.
+  - `migrations/versions/0001_initial_schema.py` created: baseline migration covering all 10 tables. Uses `_table_exists()` guards — acts as a no-op for existing databases (tables already present), creates all tables for fresh installs.
+  - `docker-entrypoint.sh`: replaced `python -m backend.init_db` with `alembic upgrade head` (migrations) then `env RUNNING_IN_DOCKER=true python -m backend.init_db` (seed only). `alembic upgrade head` is idempotent — skips already-applied revisions.
+  - `backend/init_db.py`: `create_all()` now skipped when `RUNNING_IN_DOCKER=true`; kept as local-dev convenience fallback only.
+  - `backend/main.py`: removed `Base.metadata.create_all(bind=engine)` call from app startup — schema management now belongs entirely to Alembic.
+  - **Workflow for adding new tables/columns:** add model → add import in `migrations/env.py` → `alembic revision --autogenerate -m "..."` → review → `alembic upgrade head` → commit migration file.
+
 ### ⚠️ Deviations from spec / known issues
-- **Database:** SQLite used for dev AND optionally production (intentional user decision). PostgreSQL available via Docker profile. Alembic not configured — `Base.metadata.create_all()` handles schema.
+- **Database:** SQLite used for dev AND optionally production (intentional user decision). PostgreSQL available via Docker profile. **Alembic is now wired up** — `alembic upgrade head` runs on Docker startup; `create_all()` kept only as a local-dev fallback in `init_db.py`.
 - **Backend port:** 8001 (not 8000) — port 8000 had persistent ghost TCP socket entries.
 - **MCP server:** `backend/mcp/server.py` exists but is **not mounted** in `main.py`. Needs `app.mount("/mcp", mcp_app)`.
 - **`get_db()` bug in MCP tools:** Tool functions call `get_db()` directly (generator, not session). Must use `with Session(engine) as db:`.

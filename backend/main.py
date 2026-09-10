@@ -20,9 +20,6 @@ from .routers import auth, categories, inventory, meal_prep, tags, theme, ai_ins
 from .models import user, category, inventory as inv_model, meal_prep as mp_model, tag, theme as theme_model, inventory_tag, storage_location as storage_location_model
 from pathlib import Path
 
-# Create all tables on startup (works for both PostgreSQL and SQLite)
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="KitchenCounter API")
 
 

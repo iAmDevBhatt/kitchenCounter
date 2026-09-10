@@ -1,6 +1,6 @@
 # KitchenCounter - AI Developer Reference
 
-> Last updated: 2026-09-09 (session 7). See `KITCHEN_APP_BUILD.md` §Implementation Status for full gap list.
+> Last updated: 2026-09-10 (session 9). See `KITCHEN_APP_BUILD.md` §Implementation Status for full gap list.
 
 This document provides comprehensive technical documentation for developers working on the KitchenCounter application.
 
@@ -10,7 +10,7 @@ KitchenCounter is a Progressive Web App (PWA) with:
 - **Backend**: FastAPI Python application (SQLite for dev and optionally production, PostgreSQL for production target)
 - **Frontend**: React 18 + Vite 5 with Tailwind CSS v3 (warm earthy design, Inter font)
 - **AI Integration**: MCP server stub (`backend/mcp/server.py`) — not yet mounted; Claude API fallback skeleton in `backend/ai/claude_client.py` — LLM call not yet implemented
-- **Database**: SQLite (dev, intentional) / PostgreSQL 15+ (production option). SQLAlchemy ORM with `Base.metadata.create_all()` on startup (no Alembic yet).
+- **Database**: SQLite (dev, intentional) / PostgreSQL 15+ (production option). SQLAlchemy ORM. **Alembic** manages schema migrations — `alembic upgrade head` runs on every Docker start before the seed step.
 - **Auth**: JWT via `python-jose` + bcrypt. Token stored in `localStorage`. Default credentials: `admin` / `admin123`.
 
 ## Critical Implementation Rules
@@ -173,7 +173,7 @@ KitchenCounter/
 │   │   ├── pages/
 │   │   │   ├── LoginPage.jsx
 │   │   │   ├── InventoryPage.jsx      # Tabs: All Items → In Stock (Stocked+InUse) → Running Low → Out of Stock. "Add Item" button is in the table card header (above the table), not the page header.
-│   │   │   ├── KitchenSlabPage.jsx    # Real inventory data; 4 filters; pointer-based drag to meal prep modal
+│   │   │   ├── KitchenSlabPage.jsx    # Real inventory data; 4 filters; pointer-based drag to meal prep modal; monthly plan shown as day-card grid + DayDetail slide-over with inline video embeds
 │   │   │   ├── DietStatsPage.jsx      # Dietary stats + usage trend charts (3 chart components, fixed year picker)
 │   │   │   ├── ConfigurationPage.jsx  # Tabs: Categories | Tags | Users
 │   │   │   └── ThemePage.jsx         # Wallpaper upload + palette apply
@@ -403,6 +403,33 @@ HTML5 drag API is broken inside `overflow: auto/scroll` ancestors (Chrome/Safari
 - Drop targets: `<div data-dropzone={mealName}>` — highlights when `activeOver === mealName`
 - Floating ghost: `position: fixed; z-index: 100; pointer-events: none`
 
+## Monthly Meal Plan — Day Card Grid & Detail Slide-Over
+
+The Monthly Meal Plan section (Section 2 of `KitchenSlabPage`) uses a **card grid + slide-over** pattern instead of a table.
+
+### Day Card Grid
+- `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` — one card per saved day, sorted by day number.
+- Each `DayCard` shows: day number, 🎬/🛒 indicators, three meal rows (icon + status badge + truncated ingredient list), and **View / Edit / Delete** buttons.
+- Tapping **View** opens the `DayDetail` slide-over without leaving the page.
+
+### DayDetail Slide-Over
+- Fixed panel sliding in from the right: `w-full sm:w-[420px]`, `z-50`. Backdrop click closes it.
+- Shows each meal in its own rounded section with: status badge, inline video player, notes, ingredient chips with stock-status badges.
+- **Edit** from the slide-over closes it and opens `MealPrepModal`; after saving, the slide-over re-opens with refreshed data (`saveRow` updates `viewRow` state if the saved id matches).
+- **Delete** closes the slide-over and opens `ConfirmDelete`.
+
+### Video Embed — `embedUrl(url)`
+Returns `{ src, allow }` for embeddable URLs, `null` for unknown platforms (caller shows an external link instead).
+
+| Platform | URL patterns matched | Embed target |
+|---|---|---|
+| YouTube | `youtube.com/watch?v=`, `youtu.be/`, `/shorts/`, `/live/`, `/embed/`, `m.youtube.com/` | `youtube.com/embed/{ID}?rel=0` |
+| Instagram | `/reel/`, `/p/`, `/tv/` | `instagram.com/p/{CODE}/embed` |
+| Facebook | `facebook.com/.../videos/{ID}`, `fb.watch/{ID}` | `facebook.com/plugins/video.php?href=...` |
+| Other | — | Falls back to `<a target="_blank">` external link |
+
+Videos render in a `16:9 aspect-video` iframe inside the slide-over. Non-embeddable URLs show "Open video link" which opens a new tab — this is intentional.
+
 ## Usage Trend Endpoint (AI/MCP)
 
 `GET /stats/usage-trend` — no parameters required; designed for direct AI/MCP tool calling.
@@ -498,6 +525,36 @@ SQLite `DATABASE_URL` in Docker: `sqlite:////data/db/kitchendb.sqlite` (4 slashe
 
 Container listens on `$PORT` (default `8000`, set via env var) — this is unrelated to the
 dev-only "backend port is 8001" rule above, which applies only to `start.ps1`/local `uvicorn`.
+
+## Database Migrations (Alembic)
+
+Schema changes are managed by Alembic. The `migrations/` directory holds all migration files.
+
+### Docker (production)
+`docker-entrypoint.sh` runs `alembic upgrade head` automatically before starting uvicorn. This is idempotent — already-applied revisions are skipped. Existing data is **never** wiped.
+
+### Local dev
+For local dev, `python -m backend.init_db` still calls `Base.metadata.create_all()` as a convenience fallback (only creates missing tables, never alters). To stay in sync with what Docker will run:
+```powershell
+cd C:\...\kitchenCounter
+.\backend\venv\Scripts\python.exe -m alembic upgrade head
+```
+
+### Adding a new table or column
+1. Add / modify the SQLAlchemy model in `backend/models/`.
+2. Import the model in `migrations/env.py` (alongside the existing imports).
+3. Generate a new migration:
+   ```powershell
+   .\backend\venv\Scripts\python.exe -m alembic revision --autogenerate -m "describe change"
+   ```
+4. Review the generated file in `migrations/versions/` — autogenerate is not perfect, especially for `Enum` columns and SQLite batch mode.
+5. Test locally: `.\backend\venv\Scripts\python.exe -m alembic upgrade head`
+6. Commit the new migration file alongside the model change.
+
+### Key config points
+- `alembic.ini` `script_location` → `migrations/`
+- `alembic.ini` `sqlalchemy.url` fallback → `sqlite:///./kitchendb.sqlite` (overridden at runtime by `DATABASE_URL` env var in `migrations/env.py`)
+- `render_as_batch=True` in `env.py` — required for SQLite which doesn't support `ALTER COLUMN`/`DROP COLUMN` directly; Alembic rebuilds the table in a batch operation
 
 ## How to Run (Development)
 
@@ -597,7 +654,7 @@ If `npm install` fails with `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`, run with `--str
 2. Register route in `App.jsx`
 3. Create FastAPI router in `backend/routers/`
 4. Add corresponding database models (use `UUID(as_uuid=False)`) and schemas (use `str` for UUIDs)
-5. Import model in `backend/main.py` so `Base.metadata.create_all()` sees the table
+5. Import model in `backend/main.py` AND in `migrations/env.py` so Alembic autogenerate detects the new table
 6. Update `CLAUDE.md` and `README.md`
 
 ## Next Steps

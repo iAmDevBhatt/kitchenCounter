@@ -55,13 +55,17 @@ if [ -n "$db_dir" ]; then
     fi
 fi
 
-# Run via `python -m` (not the bare `python backend/init_db.py` / `uvicorn`
-# executables) so /app is added to sys.path and `backend` resolves as the
-# top-level package that its internal `from ..database import ...`-style
-# imports require — this matches how start.ps1 runs it locally
-# (`python -m uvicorn backend.main:app` from the repo root).
-echo "[entrypoint] Running database init & seed..."
-$RUN_AS python -m backend.init_db
+# Run Alembic migrations first so any new tables/columns added since the last
+# deployment are applied safely without wiping existing data.
+# `alembic upgrade head` is idempotent — it only applies migrations that haven't
+# run yet.  The initial revision (0001) uses has_table() guards so it's a no-op
+# against databases already created by create_all() before Alembic was wired up.
+echo "[entrypoint] Running Alembic migrations..."
+$RUN_AS python -m alembic -c /app/alembic.ini upgrade head
+
+# Seed default data (admin user + root category) — skips records that already exist.
+echo "[entrypoint] Running database seed..."
+$RUN_AS env RUNNING_IN_DOCKER=true python -m backend.init_db
 
 echo "[entrypoint] Starting uvicorn on port ${PORT}..."
 exec $RUN_AS python -m uvicorn backend.main:app --host 0.0.0.0 --port "${PORT}"
