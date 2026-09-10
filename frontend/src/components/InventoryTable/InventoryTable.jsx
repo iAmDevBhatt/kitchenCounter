@@ -35,39 +35,43 @@ function imgUrl(path) {
 
 // ── Image upload zone (used inside modal) ─────────────────────────────────────
 function ImageUpload({ current, onChange }) {
-  const inputRef = useRef()
+  const inputRef  = useRef()  // library / file picker
+  const cameraRef = useRef()  // camera capture (touch only)
   const [preview, setPreview] = useState(current ? imgUrl(current) : null)
   const [dragging, setDragging] = useState(false)
 
+  // true on any device that has no fine pointer (finger / stylus)
+  const isTouch = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
+
   const pick = (file) => {
     if (!file) return
-    const url = URL.createObjectURL(file)
-    setPreview(url)
+    setPreview(URL.createObjectURL(file))
     onChange(file)
   }
 
   return (
     <div>
       <label className="label">Item Image</label>
+
+      {/* Drag-drop / click zone */}
       <div
         onDragOver={e => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={e => { e.preventDefault(); setDragging(false); pick(e.dataTransfer.files[0]) }}
-        onClick={() => inputRef.current?.click()}
-        className={`relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors
-          ${dragging ? 'border-orange-400 bg-orange-50' : 'border-orange-200 hover:border-orange-400 hover:bg-orange-50'}
+        onClick={() => !isTouch && inputRef.current?.click()}
+        className={`relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed transition-colors
+          ${isTouch ? 'cursor-default' : 'cursor-pointer hover:border-orange-400 hover:bg-orange-50'}
+          ${dragging ? 'border-orange-400 bg-orange-50' : 'border-orange-200'}
           ${preview ? 'h-36' : 'h-24'}`}
       >
         {preview ? (
           <>
-            <img
-              src={preview}
-              alt="preview"
-              className="h-full w-full object-cover rounded-xl"
-            />
-            <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/30 opacity-0 hover:opacity-100 transition-opacity">
-              <span className="text-white text-xs font-medium">Click or drop to replace</span>
-            </div>
+            <img src={preview} alt="preview" className="h-full w-full object-cover rounded-xl" />
+            {!isTouch && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/30 opacity-0 hover:opacity-100 transition-opacity">
+                <span className="text-white text-xs font-medium">Click or drop to replace</span>
+              </div>
+            )}
           </>
         ) : (
           <>
@@ -75,16 +79,56 @@ function ImageUpload({ current, onChange }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M3 16.5V19a1 1 0 001 1h16a1 1 0 001-1v-2.5M16 8l-4-4-4 4M12 4v12" />
             </svg>
-            <span className="text-xs text-stone-400">Click or drag image here</span>
+            <span className="text-xs text-stone-400">
+              {isTouch ? 'Use buttons below to add an image' : 'Click or drag image here'}
+            </span>
           </>
         )}
       </div>
+
+      {/* Touch: two explicit buttons — camera and library */}
+      {isTouch && (
+        <div className="flex gap-2 mt-2">
+          <button
+            type="button"
+            onClick={() => cameraRef.current?.click()}
+            className="flex-1 btn-secondary text-xs flex items-center justify-center gap-1.5"
+          >
+            {/* camera icon */}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <circle cx="12" cy="13" r="3" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+            </svg>
+            Take photo
+          </button>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="flex-1 btn-secondary text-xs flex items-center justify-center gap-1.5"
+          >
+            {/* photo library icon */}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Choose photo
+          </button>
+        </div>
+      )}
+
+      {/* Hidden inputs */}
+      {/* Library picker — no capture attribute so it opens the file/photo picker */}
       <input ref={inputRef} type="file" accept="image/*" className="hidden"
         onChange={e => pick(e.target.files[0])} />
+      {/* Camera input — capture="environment" opens the rear camera directly */}
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
+        onChange={e => pick(e.target.files[0])} />
+
       {preview && (
         <button
           type="button"
-          onClick={e => { e.stopPropagation(); setPreview(null); onChange(null) }}
+          onClick={() => { setPreview(null); onChange(null) }}
           className="mt-1 text-xs text-red-500 hover:text-red-700"
         >
           Remove image
