@@ -27,30 +27,198 @@ function emptyRow(day) {
   return { id: Date.now().toString(), day, Breakfast: emptyMeal(), Lunch: emptyMeal(), Dinner: emptyMeal() }
 }
 
-// ── MealCell (small read-only cell in the table) ──────────────────────────────
-function MealCell({ meal, onEdit }) {
+// ── Extract an embeddable iframe src from a share URL ────────────────────────
+// Returns { src, allow } on success, null when no embed is possible.
+function embedUrl(url) {
+  if (!url) return null
+  const s = url.trim()
+
+  // ── YouTube ──────────────────────────────────────────────────────────────
+  // Handles: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/shorts/ID,
+  //          youtube.com/live/ID, youtube.com/embed/ID, m.youtube.com/...
+  const yt = s.match(
+    /(?:youtu\.be\/|(?:www\.|m\.)?youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/|embed\/))([A-Za-z0-9_-]{11})/
+  )
+  if (yt) return {
+    src: `https://www.youtube.com/embed/${yt[1]}?rel=0`,
+    allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
+  }
+
+  // ── Instagram ────────────────────────────────────────────────────────────
+  // Handles: instagram.com/reel/CODE, /p/CODE, /tv/CODE
+  const ig = s.match(/instagram\.com\/(?:reel|p|tv)\/([A-Za-z0-9_-]+)/)
+  if (ig) return {
+    src: `https://www.instagram.com/p/${ig[1]}/embed`,
+    allow: 'autoplay; encrypted-media',
+  }
+
+  // ── Facebook ─────────────────────────────────────────────────────────────
+  // Facebook embeds require their JS SDK — use their oEmbed iframe directly.
+  // Handles: facebook.com/.../videos/ID  and  fb.watch/ID
+  const fb = s.match(/(?:facebook\.com\/.+\/videos\/(\d+)|fb\.watch\/([A-Za-z0-9_-]+))/)
+  if (fb) {
+    const encoded = encodeURIComponent(s.split('?')[0])
+    return {
+      src: `https://www.facebook.com/plugins/video.php?href=${encoded}&show_text=false&width=560`,
+      allow: 'autoplay; clipboard-write; encrypted-media; picture-in-picture',
+    }
+  }
+
+  return null  // unknown platform — caller falls back to an external link
+}
+
+// ── Day summary card (shown in the grid) ─────────────────────────────────────
+function DayCard({ row, onView, onEdit, onDelete }) {
+  const hasAnyItems = MEALS.some(m => row[m].items.length > 0)
+  const hasVideo    = MEALS.some(m => row[m].video_url)
   return (
-    <div className="min-h-[60px]">
-      <div className="flex items-center gap-1 mb-1">
-        <span className={`${STATUS_BADGE[meal.status]} text-[10px]`}>{meal.status}</span>
-        {meal.video_url && (
-          <a href={meal.video_url} target="_blank" rel="noreferrer"
-             className="text-orange-500 hover:text-orange-700" title="Video recipe">
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-          </a>
-        )}
+    <div className="bg-white border border-orange-100 rounded-2xl shadow-sm hover:shadow-md hover:border-orange-300 transition-all flex flex-col">
+      {/* Day header */}
+      <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-orange-50">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl font-bold text-orange-600 leading-none">{row.day}</span>
+          <div className="flex flex-col gap-0.5">
+            {hasVideo && <span className="text-[10px] text-stone-400">🎬 video</span>}
+            {hasAnyItems && <span className="text-[10px] text-stone-400">🛒 items</span>}
+          </div>
+        </div>
+        <button
+          onClick={() => onView(row)}
+          className="btn-primary text-xs px-3 min-h-[36px]"
+        >
+          View
+        </button>
       </div>
-      {meal.notes && <p className="text-xs text-stone-500 mb-1 line-clamp-1">{meal.notes}</p>}
-      <div className="flex flex-wrap gap-1">
-        {meal.items.map(it => (
-          <span key={it.id} className="text-[10px] bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 text-orange-700">
-            {it.name}
-          </span>
+
+      {/* Meal status pills */}
+      <div className="flex flex-col gap-1.5 px-4 py-3 flex-1">
+        {MEALS.map(m => (
+          <div key={m} className="flex items-center justify-between gap-2">
+            <span className="text-xs text-stone-500 shrink-0">{MEAL_ICONS[m]} {m}</span>
+            <div className="flex items-center gap-1 min-w-0">
+              <span className={`${STATUS_BADGE[row[m].status]} text-[10px] shrink-0`}>{row[m].status}</span>
+              {row[m].items.length > 0 && (
+                <span className="text-[10px] text-stone-400 truncate">
+                  {row[m].items.map(i => i.name).join(', ')}
+                </span>
+              )}
+            </div>
+          </div>
         ))}
       </div>
+
+      {/* Edit / Delete */}
+      <div className="flex gap-2 px-4 pb-3">
+        <button onClick={() => onEdit(row)}   className="flex-1 btn-secondary text-xs min-h-[36px]">Edit</button>
+        <button onClick={() => onDelete(row)} className="flex-1 btn-danger   text-xs min-h-[36px]">Delete</button>
+      </div>
     </div>
+  )
+}
+
+// ── Day detail slide-over ─────────────────────────────────────────────────────
+function DayDetail({ row, onEdit, onDelete, onClose }) {
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* Panel — slides in from right */}
+      <div className="fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 bg-white shadow-2xl flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-orange-100 shrink-0">
+          <div>
+            <p className="text-xs text-stone-400 uppercase tracking-wide font-semibold">Meal Plan</p>
+            <h2 className="text-xl font-bold text-stone-800">Day {row.day}</h2>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => onEdit(row)}   className="btn-secondary text-xs min-h-[36px] px-3">Edit</button>
+            <button onClick={() => onDelete(row)} className="btn-danger   text-xs min-h-[36px] px-3">Delete</button>
+            <button onClick={onClose} className="w-11 h-11 flex items-center justify-center rounded-xl btn-ghost">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Meals */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {MEALS.map(m => {
+            const meal   = row[m]
+            const embed  = embedUrl(meal.video_url)
+            const noData = !meal.video_url && !meal.notes && meal.items.length === 0
+            return (
+              <div key={m} className="rounded-2xl border border-orange-100 overflow-hidden">
+                {/* Meal header */}
+                <div className="flex items-center justify-between px-4 py-2.5 bg-orange-50/60">
+                  <span className="font-semibold text-stone-800 text-sm">{MEAL_ICONS[m]} {m}</span>
+                  <span className={`${STATUS_BADGE[meal.status]} text-[11px]`}>{meal.status}</span>
+                </div>
+
+                {noData ? (
+                  <p className="px-4 py-3 text-xs text-stone-400 italic">Nothing planned.</p>
+                ) : (
+                  <div className="px-4 py-3 space-y-3">
+                    {/* Video embed */}
+                    {embed && (
+                      <div className="rounded-xl overflow-hidden aspect-video bg-black">
+                        <iframe
+                          src={embed.src}
+                          className="w-full h-full"
+                          allow={embed.allow}
+                          allowFullScreen
+                          title={`${m} recipe video`}
+                        />
+                      </div>
+                    )}
+                    {/* External link fallback for non-embeddable platforms */}
+                    {meal.video_url && !embed && (
+                      <a
+                        href={meal.video_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-2 text-xs text-orange-600 hover:text-orange-800 font-medium"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        Open video link
+                      </a>
+                    )}
+
+                    {/* Notes */}
+                    {meal.notes && (
+                      <p className="text-sm text-stone-600 leading-relaxed">{meal.notes}</p>
+                    )}
+
+                    {/* Ingredient list */}
+                    {meal.items.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-1.5">Ingredients</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {meal.items.map(it => (
+                            <span key={it.id}
+                              className="inline-flex items-center gap-1 text-xs bg-orange-50 border border-orange-200 rounded-full px-2.5 py-1 text-orange-700 font-medium">
+                              {it.name}
+                              {it.status && (
+                                <span className={`${INV_STATUS_BADGE[it.status]} text-[9px] ml-0.5`}>{it.status}</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -77,7 +245,7 @@ function MealDropZone({ mealName, meal, onChange, activeOver }) {
 
       <input
         className="input text-xs mb-2"
-        placeholder="Video URL (YouTube / Instagram…)"
+        placeholder="Video URL (YouTube / Instagram / Facebook…)"
         value={meal.video_url}
         onChange={e => onChange({ ...meal, video_url: e.target.value })}
       />
@@ -355,6 +523,7 @@ export default function KitchenSlabPage() {
   const [rows, setRows]     = useState([])
   const [modalRow, setModalRow]   = useState(undefined)
   const [deleteRow, setDeleteRow] = useState(null)
+  const [viewRow,  setViewRow]    = useState(null)
   const [monthCreated, setMonthCreated] = useState(false)
 
   // ── Inventory state ──────────────────────────────────────────────────────
@@ -399,11 +568,14 @@ export default function KitchenSlabPage() {
         : [...prev, saved].sort((a,b) => a.day - b.day)
     })
     setModalRow(undefined)
+    // If the slide-over was open for this row, refresh it with the new data
+    setViewRow(prev => prev?.id === saved.id ? saved : prev)
   }, [])
 
   const confirmDelete = useCallback(() => {
     setRows(prev => prev.filter(r => r.id !== deleteRow.id))
     setDeleteRow(null)
+    setViewRow(null)
   }, [deleteRow])
 
   return (
@@ -577,45 +749,31 @@ export default function KitchenSlabPage() {
                 </button>
               </div>
             ) : (
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th className="th w-16">Day</th>
-                      {MEALS.map(m => (
-                        <th key={m} className="th">{MEAL_ICONS[m]} {m}</th>
-                      ))}
-                      <th className="th w-20">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map(row => (
-                      <tr key={row.id} className="hover:bg-orange-50/30 transition-colors align-top">
-                        <td className="td font-bold text-stone-700 text-center">{row.day}</td>
-                        {MEALS.map(m => (
-                          <td key={m} className="td">
-                            <MealCell meal={row[m]} />
-                          </td>
-                        ))}
-                        <td className="td">
-                          <div className="flex gap-1.5 flex-col">
-                            <button
-                              onClick={() => setModalRow(row)}
-                              className="btn-secondary text-xs px-3 min-h-[36px]">Edit</button>
-                            <button
-                              onClick={() => setDeleteRow(row)}
-                              className="btn-danger text-xs px-3 min-h-[36px]">Delete</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {rows.map(row => (
+                  <DayCard
+                    key={row.id}
+                    row={row}
+                    onView={r => setViewRow(r)}
+                    onEdit={r => { setViewRow(null); setModalRow(r) }}
+                    onDelete={r => { setViewRow(null); setDeleteRow(r) }}
+                  />
+                ))}
               </div>
             )}
           </>
         )}
       </div>
+
+      {/* ── Day detail slide-over ── */}
+      {viewRow && (
+        <DayDetail
+          row={viewRow}
+          onEdit={r => { setViewRow(null); setModalRow(r) }}
+          onDelete={r => { setViewRow(null); setDeleteRow(r) }}
+          onClose={() => setViewRow(null)}
+        />
+      )}
 
       {/* ── Modals ── */}
       {modalRow !== undefined && (
