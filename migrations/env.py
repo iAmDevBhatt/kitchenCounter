@@ -35,6 +35,8 @@ from backend.models import (  # noqa: E402, F401
     theme as theme_model,
     inventory_tag,
     storage_location as storage_location_model,
+    recipe as recipe_model,
+    app_settings as app_settings_model,
 )
 
 config = context.config

@@ -15,9 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from .database import engine, Base
-from .routers import auth, categories, inventory, meal_prep, tags, theme, ai_insights, storage_locations, stats
+from .routers import auth, categories, inventory, meal_prep, tags, theme, ai_insights, storage_locations, stats, recipes, app_settings
 # import all models so Base.metadata.create_all sees every table
-from .models import user, category, inventory as inv_model, meal_prep as mp_model, tag, theme as theme_model, inventory_tag, storage_location as storage_location_model
+from .models import user, category, inventory as inv_model, meal_prep as mp_model, tag, theme as theme_model, inventory_tag, storage_location as storage_location_model, recipe as recipe_model, app_settings as app_settings_model
 from pathlib import Path
 
 app = FastAPI(title="KitchenCounter API")
@@ -67,6 +67,8 @@ app.include_router(theme.router, prefix="/theme", tags=["Theme"])
 app.include_router(ai_insights.router, prefix="/ai-insights", tags=["AI Insights"])
 app.include_router(storage_locations.router, prefix="/storage-locations", tags=["Storage Locations"])
 app.include_router(stats.router, prefix="/stats", tags=["Stats"])
+app.include_router(recipes.router, prefix="/recipes", tags=["Recipes"])
+app.include_router(app_settings.router, prefix="/app-settings", tags=["App Settings"])
 
 
 # ── Serve the built frontend (single-container production image) ──────────

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import Layout from '../components/Layout/Layout'
 import useLabels from '../hooks/useLabels'
 import apiClient from '../api/index.js'
+import RecipePicker from '../components/RecipePicker/RecipePicker'
 
 // ── constants ────────────────────────────────────────────────────────────────
 const MEALS = ['Breakfast', 'Lunch', 'Dinner']
@@ -227,6 +228,7 @@ function DayDetail({ row, onEdit, onDelete, onClose }) {
 function MealDropZone({ mealName, meal, onChange, activeOver }) {
   const removeItem = (id) => onChange({ ...meal, items: meal.items.filter(i => i.id !== id) })
   const over = activeOver === mealName
+  const [showRecipePicker, setShowRecipePicker] = useState(false)
 
   return (
     <div className="border border-orange-100 rounded-xl p-3">
@@ -243,12 +245,31 @@ function MealDropZone({ mealName, meal, onChange, activeOver }) {
         </select>
       </div>
 
-      <input
-        className="input text-xs mb-2"
-        placeholder="Video URL (YouTube / Instagram / Facebook…)"
-        value={meal.video_url}
-        onChange={e => onChange({ ...meal, video_url: e.target.value })}
-      />
+      {/* Video URL row: text input + Browse Recipes button */}
+      <div className="flex gap-1.5 mb-2">
+        <input
+          className="input text-xs flex-1 min-w-0"
+          placeholder="Video URL (YouTube / Instagram / Facebook…)"
+          value={meal.video_url}
+          onChange={e => onChange({ ...meal, video_url: e.target.value })}
+        />
+        <button
+          type="button"
+          onClick={() => setShowRecipePicker(true)}
+          title="Browse saved recipes"
+          className="shrink-0 px-2 py-1 rounded-lg bg-orange-50 border border-orange-200 text-orange-600 hover:bg-orange-100 transition-colors text-xs flex items-center gap-1"
+        >
+          <span>📖</span>
+          <span className="hidden sm:inline">Recipes</span>
+        </button>
+      </div>
+
+      {showRecipePicker && (
+        <RecipePicker
+          onPick={url => onChange({ ...meal, video_url: url })}
+          onClose={() => setShowRecipePicker(false)}
+        />
+      )}
       <textarea
         className="input text-xs mb-2 resize-none"
         rows={2}

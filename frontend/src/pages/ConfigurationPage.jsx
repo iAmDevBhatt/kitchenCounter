@@ -4,12 +4,14 @@ import CategoryTree from '../components/CategoryTree/CategoryTree'
 import TagManager from '../components/TagManager/TagManager'
 import UserManagement from '../components/UserManagement/UserManagement'
 import StorageLocationManager from '../components/StorageLocationManager/StorageLocationManager'
+import DownloadLocationManager from '../components/DownloadLocationManager/DownloadLocationManager'
 
 const TABS = [
-  { key: 'categories', label: 'Category Management',  icon: '🗂️' },
-  { key: 'tags',       label: 'Tag Management',        icon: '🏷️' },
-  { key: 'locations',  label: 'Storage Locations',     icon: '📍' },
-  { key: 'users',      label: 'User Management',       icon: '👥' },
+  { key: 'categories',       label: 'Category Management',  icon: '🗂️' },
+  { key: 'tags',             label: 'Tag Management',        icon: '🏷️' },
+  { key: 'locations',        label: 'Storage Locations',     icon: '📍' },
+  { key: 'users',            label: 'User Management',       icon: '👥' },
+  { key: 'download-location', label: 'Download Location',   icon: '📥' },
 ]
 
 export default function ConfigurationPage() {
@@ -36,10 +38,11 @@ export default function ConfigurationPage() {
       </div>
 
       <div className="card">
-        {activeTab === 'categories' && <CategoryTree />}
-        {activeTab === 'tags'       && <TagManager />}
-        {activeTab === 'locations'  && <StorageLocationManager />}
-        {activeTab === 'users'      && <UserManagement />}
+        {activeTab === 'categories'        && <CategoryTree />}
+        {activeTab === 'tags'              && <TagManager />}
+        {activeTab === 'locations'         && <StorageLocationManager />}
+        {activeTab === 'users'             && <UserManagement />}
+        {activeTab === 'download-location' && <DownloadLocationManager />}
       </div>
     </Layout>
   )

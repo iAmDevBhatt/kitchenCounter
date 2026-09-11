@@ -7,7 +7,7 @@
 
 ---
 
-## Implementation Status (last updated 2026-09-10 session 9)
+## Implementation Status (last updated 2026-09-11 session 10)
 
 ### ✅ Completed
 - All database models (SQLAlchemy `UUID(as_uuid=False)`), schemas (`str` UUIDs), and CRUD routers
@@ -77,6 +77,26 @@
   - `backend/main.py`: removed `Base.metadata.create_all(bind=engine)` call from app startup — schema management now belongs entirely to Alembic.
   - **Workflow for adding new tables/columns:** add model → add import in `migrations/env.py` → `alembic revision --autogenerate -m "..."` → review → `alembic upgrade head` → commit migration file.
 
+- **Session 10 (2026-09-11) — Recipes page + PWA share target + download infrastructure:**
+  - New `recipes` DB table (`backend/models/recipe.py`): id, name, url, notes, created_at, updated_at. Shared across all users (no `created_by`).
+  - New `app_settings` DB table (`backend/models/app_settings.py`): key/value store for app-wide settings. Initial key: `download_dir`.
+  - Alembic migration `9052dc86740f` adds both tables. Runs automatically on Docker start.
+  - `backend/routers/recipes.py`: full CRUD (`GET /`, `POST /`, `GET /{id}`, `PUT /{id}`, `DELETE /{id}`) + `POST /{id}/download` (background task — yt-dlp for video URLs, wget for page URLs).
+  - `backend/routers/app_settings.py`: `GET /{key}` + `PUT /{key}` (upsert). Only `download_dir` allowed.
+  - Both routers registered in `main.py` at `/recipes` and `/app-settings`.
+  - `frontend/src/pages/RecipesPage.jsx`: full table with search-by-name, play modal (embedded video or external link fallback), per-row download button (spinner → checkmark), add/edit modal, delete confirm modal. Platform icon detection (YouTube/Instagram/Facebook/TikTok/Vimeo).
+  - `frontend/src/components/RecipePicker/RecipePicker.jsx`: searchable recipe-picker modal used inside `MealPrepModal` to look up and fill a recipe URL into a meal entry.
+  - `KitchenSlabPage.jsx` `MealDropZone`: video URL input now has a "📖 Recipes" button that opens `RecipePicker` to pick from saved recipes.
+  - `ConfigurationPage`: new "Download Location" tab (📥) added. Renders `DownloadLocationManager`.
+  - `frontend/src/components/DownloadLocationManager/DownloadLocationManager.jsx`: reads/writes `download_dir` via `/api/app-settings/download_dir`. Shows Docker volume tip.
+  - `frontend/public/manifest.json` created: PWA manifest with Web Share Target (`/share-target?url=&title=&text=`). `index.html` links the manifest + adds `theme-color` meta.
+  - `App.jsx`: `/share-target` route redirects to `/recipes?url=...`. `RecipesPage` auto-opens Add modal when `?url=` query param is present (from mobile PWA share).
+  - `Layout.jsx` NAV: added `{ to: '/recipes', icon: '📖', label: 'nav.recipes' }` between Kitchen Slab and Configuration.
+  - `labels.properties`: added `nav.recipes=Recipes`.
+  - `Dockerfile`: added `wget`, `ffmpeg`, `python3-pip`, and `yt-dlp` to the runtime stage. Added `/app/backend/static/downloads` directory creation.
+  - `docker-compose.yml`: added `DOWNLOAD_DIR` env var and `downloads_data` named volume mapped to `/app/backend/static/downloads`.
+  - `.env`: added `DOWNLOAD_DIR=backend/static/downloads` for local dev.
+
 ### ⚠️ Deviations from spec / known issues
 - **Database:** SQLite used for dev AND optionally production (intentional user decision). PostgreSQL available via Docker profile. **Alembic is now wired up** — `alembic upgrade head` runs on Docker startup; `create_all()` kept only as a local-dev fallback in `init_db.py`.
 - **Backend port:** 8001 (not 8000) — port 8000 had persistent ghost TCP socket entries.
@@ -86,7 +106,7 @@
 - **`/ai-insights/mcp` route:** Missing — `AIInsightsPanel` calls it but it doesn't exist in `ai_insights.py`.
 - **`AIInsightsPanel` import:** Imports `../../api/client` — should be `../../api/index.js`.
 - **No `__init__.py`:** Relative imports work because `PYTHONPATH` is set in `main.py`.
-- **PWA:** `vite-plugin-pwa` not installed.
+- **PWA:** `vite-plugin-pwa` not installed (service worker not configured). `manifest.json` is present with Web Share Target for mobile sharing — install button and offline support require the plugin.
 - **shadcn/ui + @dnd-kit:** Not installed. UI is raw Tailwind; drag-and-drop uses a custom mouse-event system (not HTML5 drag API and not @dnd-kit).
 - **Zustand store:** Not created. State is local `useState` + `ThemeContext`.
 

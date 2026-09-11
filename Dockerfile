@@ -20,7 +20,8 @@ WORKDIR /app
 #       PUID/PGID) and then step down to an unprivileged user before exec'ing
 #       uvicorn
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl gosu \
+    && apt-get install -y --no-install-recommends curl gosu wget ffmpeg python3-pip \
+    && pip3 install --no-cache-dir yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .
@@ -36,7 +37,7 @@ COPY backend/ ./backend/
 COPY --from=frontend-build /src/frontend/dist ./backend/frontend_dist
 
 # Persistent directories — bind-mounted as volumes in docker-compose
-RUN mkdir -p /app/backend/static/uploads /data/db
+RUN mkdir -p /app/backend/static/uploads /app/backend/static/downloads /data/db
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

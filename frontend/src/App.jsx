@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import DietStatsPage from './pages/DietStatsPage'
 import InventoryPage from './pages/InventoryPage'
 import KitchenSlabPage from './pages/KitchenSlabPage'
+import RecipesPage from './pages/RecipesPage'
 import ConfigurationPage from './pages/ConfigurationPage'
 import ThemePage from './pages/ThemePage'
 
@@ -31,6 +32,9 @@ function App() {
           <Route path="/diet-stats" element={<RequireAuth><DietStatsPage /></RequireAuth>} />
           <Route path="/inventory" element={<RequireAuth><InventoryPage /></RequireAuth>} />
           <Route path="/kitchen-slab" element={<RequireAuth><KitchenSlabPage /></RequireAuth>} />
+          <Route path="/recipes" element={<RequireAuth><RecipesPage /></RequireAuth>} />
+          {/* PWA Web Share Target — redirects to /recipes with ?url=... so RecipesPage auto-opens the Add modal */}
+          <Route path="/share-target" element={<RequireAuth><Navigate to={`/recipes${window.location.search}`} replace /></RequireAuth>} />
           <Route path="/configuration" element={<RequireAuth><ConfigurationPage /></RequireAuth>} />
           <Route path="/theme" element={<RequireAuth><ThemePage /></RequireAuth>} />
 

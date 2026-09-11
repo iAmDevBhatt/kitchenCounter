@@ -1,6 +1,6 @@
 # KitchenCounter - AI Developer Reference
 
-> Last updated: 2026-09-10 (session 9). See `KITCHEN_APP_BUILD.md` §Implementation Status for full gap list.
+> Last updated: 2026-09-11 (session 10). See `KITCHEN_APP_BUILD.md` §Implementation Status for full gap list.
 
 This document provides comprehensive technical documentation for developers working on the KitchenCounter application.
 
@@ -112,7 +112,7 @@ The `candidate.parent == _frontend_dist` guard ensures only files directly in `d
 | `anthropic` missing | `backend/requirements.txt` | Add `anthropic>=0.40.0` |
 | `/ai-insights/mcp` missing | `backend/routers/ai_insights.py` | Add POST route |
 | `AIInsightsPanel` import | `frontend/src/components/AIInsightsPanel/AIInsightsPanel.jsx` | Fix import to `../../api/index.js` |
-| PWA not configured | `frontend/` | Install `vite-plugin-pwa`, configure service worker |
+| PWA service worker missing | `frontend/` | Install `vite-plugin-pwa`, configure service worker (manifest.json + share target already present) |
 
 ## Project Structure
 
@@ -169,13 +169,16 @@ KitchenCounter/
 │   │   │   ├── UserManagement/ # Live API, full CRUD (was mocked, now real)
 │   │   │   ├── MealPrepGrid/
 │   │   │   ├── DragDropItems/
-│   │   │   └── AIInsightsPanel/
+│   │   │   ├── AIInsightsPanel/
+│   │   │   ├── RecipePicker/          # Searchable recipe-URL picker modal; used in KitchenSlabPage MealDropZone
+│   │   │   └── DownloadLocationManager/ # Reads/writes download_dir via /api/app-settings
 │   │   ├── pages/
 │   │   │   ├── LoginPage.jsx
 │   │   │   ├── InventoryPage.jsx      # Tabs: All Items → In Stock (Stocked+InUse) → Running Low → Out of Stock. "Add Item" button is in the table card header (above the table), not the page header.
 │   │   │   ├── KitchenSlabPage.jsx    # Real inventory data; 4 filters; pointer-based drag to meal prep modal; monthly plan shown as day-card grid + DayDetail slide-over with inline video embeds
+│   │   │   ├── RecipesPage.jsx        # Recipe list: search, play modal, download button, add/edit/delete; auto-opens Add from ?url= (PWA share target)
 │   │   │   ├── DietStatsPage.jsx      # Dietary stats + usage trend charts (3 chart components, fixed year picker)
-│   │   │   ├── ConfigurationPage.jsx  # Tabs: Categories | Tags | Users
+│   │   │   ├── ConfigurationPage.jsx  # Tabs: Categories | Tags | Storage Locations | Users | Download Location
 │   │   │   └── ThemePage.jsx         # Wallpaper upload + palette apply
 │   │   └── api/
 │   │       └── index.js        # Axios client, baseURL: '/api'
@@ -304,6 +307,30 @@ Data for a month is NOT created until the user explicitly creates it.
 | extracted_palette | JSONB | colorthief output |
 | active | BOOLEAN | one active per user |
 
+### recipes
+Shared across all users (no `created_by`).
+
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID PK (str) | |
+| name | VARCHAR(300) | |
+| url | TEXT | YouTube / Instagram / Facebook / any URL |
+| notes | TEXT | nullable |
+| created_at | TIMESTAMP | |
+| updated_at | TIMESTAMP | |
+
+### app_settings
+App-wide key/value store (one row per key).
+
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID PK (str) | |
+| key | VARCHAR(100) UNIQUE | e.g. `download_dir` |
+| value | TEXT | nullable |
+| updated_at | TIMESTAMP | |
+
+**Allowed keys:** `download_dir` (server path where recipe downloads are saved; default `/app/backend/static/downloads`).
+
 ## API Route Table
 
 | Method | Route | Description |
@@ -344,6 +371,14 @@ Data for a month is NOT created until the user explicitly creates it.
 | `GET` | `/stats/dietary/{year}/{month}` | Dietary tag stats + nutrition totals for a month |
 | `GET` | `/stats/inventory-overview` | Inventory health snapshot (status, expiry, top categories) |
 | `GET` | `/stats/usage-trend` | Rolling 6-month item usage trend — designed for AI/MCP tool calling (no params) |
+| `GET` | `/recipes/` | List all recipes |
+| `POST` | `/recipes/` | Create recipe |
+| `GET` | `/recipes/{id}` | Get single recipe |
+| `PUT` | `/recipes/{id}` | Update recipe |
+| `DELETE` | `/recipes/{id}` | Delete recipe |
+| `POST` | `/recipes/{id}/download` | Start background download (yt-dlp for video, wget for pages) |
+| `GET` | `/app-settings/{key}` | Get app setting (returns default if not set) |
+| `PUT` | `/app-settings/{key}` | Upsert app setting |
 
 ## Key Business Rules
 
@@ -576,6 +611,7 @@ UPLOAD_DIR=backend/static/uploads
 ANTHROPIC_API_KEY=your_key_here
 MCP_ENABLED=true
 CORS_ORIGINS=*
+DOWNLOAD_DIR=backend/static/downloads
 ```
 
 ## Docker Deployment (blr-stack)
@@ -660,7 +696,27 @@ If `npm install` fails with `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`, run with `--str
 ## Next Steps
 
 - **Phase 6 (AI):** Mount MCP server in `main.py`; fix `get_db()` in `mcp/server.py`; implement Claude LLM call in `claude_client.py`; add `/ai-insights/mcp` route; fix `AIInsightsPanel` import
-- **Phase 7 (PWA):** Install `vite-plugin-pwa`; configure service worker and manifest
+- **Phase 7 (PWA):** Install `vite-plugin-pwa`; configure service worker for offline support and home-screen install (manifest.json already present with share target)
 - **Phase 8 (Nutrition charts):** Implement nutrient intake pie charts by month using tags + nutrition data from inventory items linked to meal preps
+
+## Recipes Feature
+
+### Architecture
+- **Backend:** `recipes` table (shared across all users) + `app_settings` key/value table
+- **Download:** `POST /recipes/{id}/download` dispatches a `BackgroundTask` that runs `yt-dlp` (video URLs) or `wget` (page URLs). Download directory is read from `app_settings.download_dir` (falls back to `DOWNLOAD_DIR` env var, then `/app/backend/static/downloads`).
+- **Frontend:** `RecipesPage.jsx` — full CRUD table with search, embedded play modal, per-row download status (spinner → ✓), add/edit/delete
+- **Kitchen Slab integration:** `MealDropZone` has a "📖 Recipes" button next to the video URL input that opens `RecipePicker` — a searchable modal listing all saved recipes so the user can pick one to fill the URL field
+- **Configuration:** "Download Location" tab in ConfigurationPage → `DownloadLocationManager` component reads/writes `/api/app-settings/download_dir`
+- **PWA Share Target:** `manifest.json` declares `share_target` at `/share-target?url=&title=&text=`. When the user shares a URL from their phone browser to the KitchenCounter PWA, `App.jsx` routes it to `/recipes?url=...` and `RecipesPage` auto-opens the Add modal pre-filled.
+
+### embedUrl() helper
+Both `RecipesPage` and `KitchenSlabPage` (for the DayDetail slide-over) use the same embed URL pattern. The canonical implementation lives in `RecipesPage.jsx`. If you need to share it, extract to `frontend/src/utils/embedUrl.js`.
+
+### Docker — downloads volume
+```yaml
+volumes:
+  - downloads_data:/app/backend/static/downloads
+```
+The `Dockerfile` installs `yt-dlp` (via pip) + `wget` + `ffmpeg` in the runtime stage and creates `/app/backend/static/downloads`.
 
 This file should be updated at the end of every development phase and whenever schema, route, or structural changes occur.

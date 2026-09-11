@@ -6,6 +6,7 @@ const NAV = [
   { to: '/diet-stats',    icon: '📊', label: 'nav.diet-stats' },
   { to: '/inventory',     icon: '📦', label: 'nav.inventory' },
   { to: '/kitchen-slab',  icon: '🍽️', label: 'nav.kitchen-slab' },
+  { to: '/recipes',       icon: '📖', label: 'nav.recipes' },
   { to: '/configuration', icon: '⚙️', label: 'nav.configuration' },
   { to: '/theme',         icon: '🎨', label: 'nav.theme' },
 ]

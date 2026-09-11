@@ -62,9 +62,11 @@ services:
       # volumes below; leave at 0/0 (or unset) to run as root.
       PUID: "0"
       PGID: "0"
+      DOWNLOAD_DIR: "/app/backend/static/downloads"
     volumes:
-      - uploads_data:/app/backend/static/uploads   # item images — survives rebuilds
-      - db_data:/data/db                   # SQLite DB — survives rebuilds
+      - uploads_data:/app/backend/static/uploads       # item images — survives rebuilds
+      - downloads_data:/app/backend/static/downloads   # recipe downloads — survives rebuilds
+      - db_data:/data/db                               # SQLite DB — survives rebuilds
     networks:
       - blr-net
     ports:
@@ -72,5 +74,6 @@ services:
 
 volumes:
   postgres_data:
-  uploads_data:    # persistent uploaded images
-  db_data:         # persistent SQLite database file
+  uploads_data:      # persistent uploaded images
+  downloads_data:    # persistent recipe downloads
+  db_data:           # persistent SQLite database file

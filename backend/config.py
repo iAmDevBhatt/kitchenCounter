@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     secret_key: str
     access_token_expire_minutes: int = 480
     upload_dir: str = "backend/static/uploads"
+    download_dir: str = "backend/static/downloads"
     anthropic_api_key: Optional[str] = None
     mcp_enabled: bool = True
     cors_origins: str = "*"
