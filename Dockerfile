@@ -34,6 +34,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # root). Flattening breaks those imports with "attempted relative import
 # beyond top-level package".
 COPY backend/ ./backend/
+COPY alembic.ini ./alembic.ini
+COPY migrations/ ./migrations/
 COPY --from=frontend-build /src/frontend/dist ./backend/frontend_dist
 
 # Persistent directories — bind-mounted as volumes in docker-compose
