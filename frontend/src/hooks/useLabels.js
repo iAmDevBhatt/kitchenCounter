@@ -16,6 +16,7 @@ const useLabels = () => {
       'nav.configuration': 'Configuration',
       'nav.theme': 'Theme',
       'nav.logout': 'Logout',
+      'nav.recipes': 'Recipes',
       'page.inventory.title': 'My Kitchen Inventory',
       'page.kitchen-slab.title': 'Kitchen Slab',
       'page.configuration.title': 'Configuration',
