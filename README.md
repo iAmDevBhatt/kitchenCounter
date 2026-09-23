@@ -210,7 +210,7 @@ KitchenCounter/
 │   │   ├── hooks/useLabels.js    # i18n via labels.properties
 │   │   ├── assets/labels.properties
 │   │   ├── components/
-│   │   │   ├── Layout/           # Nav header + mobile strip + wallpaper background
+│   │   │   ├── Layout/           # Nav header + phone bottom tab bar + wallpaper background
 │   │   │   ├── CategoryTree/     # Live CRUD, unlimited depth
 │   │   │   ├── InventoryTable/   # Full CRUD, image upload, tags, CategoryPicker, BulkImportExport
 │   │   │   ├── TagManager/
@@ -269,10 +269,27 @@ Full route table in `CLAUDE.md`.
 
 The app is fully responsive — tested on laptop, tablet, and phone.
 
-### Install as a home-screen app (Android Chrome)
-1. Open the app URL in Chrome
-2. Tap the browser menu → **Add to Home Screen**
-3. The app opens in standalone mode (no browser chrome)
+**On a phone:**
+- A bottom tab bar replaces the top nav (Diet & Stats · Inventory · Kitchen Slab · Recipes · **More** → Configuration, Theme, Logout).
+- Inventory and Recipes show as cards instead of wide tables. You can edit usage with the slider right on each card.
+- Forms open as bottom sheets.
+- In the meal-plan editor, tap 🌅 / ☀️ / 🌙 next to an item to add it to Breakfast / Lunch / Dinner. You can also long-press an item and drag it.
+
+### Install on Android (Chrome)
+1. Open the app URL in Chrome and log in
+2. Tap **⋮ → Add to Home screen** (or **Install app** if Chrome offers it)
+3. Launch it from the home-screen icon — it opens full-screen with no address bar
+
+### Install on iPhone / iPad (Safari)
+1. Open the app URL in **Safari** (other iOS browsers can't install web apps on older iOS versions)
+2. Tap **Share → Add to Home Screen → Add**
+3. Launch it from the home-screen icon — it opens full-screen
+
+### Tips for a smooth install
+- **Use HTTPS.** Over plain `http://192.168.x.x:8007`, Android adds a normal bookmark shortcut rather than an installed app, and **Share → KitchenCounter** won't appear. Put the app behind HTTPS, for example a reverse proxy (Caddy / Nginx Proxy Manager / Traefik) with a certificate, Tailscale `serve`, or a Cloudflare Tunnel.
+- **Log in once in the browser first.** The login token lives in the browser's storage. On iOS, the home-screen app has its own storage, so you'll log in again the first time you open it.
+- **Offline use isn't supported yet.** There's no service worker (`vite-plugin-pwa` is Phase 7), so the app needs a connection to your server.
+- **After a redeploy,** fully close and reopen the home-screen app to pick up the new version.
 
 ### Share a recipe URL from your phone
 1. Find a recipe on YouTube, Instagram, or any website
@@ -319,7 +336,7 @@ npm config set strict-ssl true
 | MCP server (`backend/mcp/server.py`) | Stub — not mounted in `main.py` |
 | Claude LLM call (`backend/ai/claude_client.py`) | Skeleton — `messages.create()` not implemented |
 | `/ai-insights/mcp` route | Missing |
-| PWA service worker / offline support | `manifest.json` present; `vite-plugin-pwa` not installed |
+| PWA service worker / offline support | Manifest, PNG icons and iOS meta tags are present, so the app is installable; `vite-plugin-pwa` is not installed, so there's no offline support |
 | Nutrition intake pie charts (by month) | Not yet built |
 
 ---

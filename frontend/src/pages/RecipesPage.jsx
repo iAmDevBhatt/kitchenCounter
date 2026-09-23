@@ -62,7 +62,7 @@ function PlayModal({ recipe, onClose }) {
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100">
           <span className="font-semibold text-stone-800 truncate pr-4">{recipe.name}</span>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-stone-100 transition-colors text-stone-500 hover:text-stone-800" aria-label="Close">
+          <button onClick={onClose} className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-stone-100 transition-colors text-stone-500 hover:text-stone-800" aria-label="Close">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -139,17 +139,17 @@ function RecipeFormModal({ initial, onSave, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100">
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-panel sm:max-w-lg" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-100 shrink-0">
           <h2 className="text-lg font-semibold text-stone-800">{initial ? 'Edit Recipe' : 'Add Recipe'}</h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-stone-100 text-stone-500 hover:text-stone-800">
+          <button onClick={onClose} className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-stone-100 text-stone-500 hover:text-stone-800">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
           <div>
             <label className="block text-sm font-medium text-stone-700 mb-1">Recipe Name <span className="text-red-500">*</span></label>
             <input
@@ -183,8 +183,8 @@ function RecipeFormModal({ initial, onSave, onClose }) {
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
-            <button type="submit" className="btn-primary" disabled={saving}>
+            <button type="button" onClick={onClose} className="btn-ghost flex-1 sm:flex-none justify-center">Cancel</button>
+            <button type="submit" className="btn-primary flex-1 sm:flex-none justify-center" disabled={saving}>
               {saving ? 'Saving…' : 'Save Recipe'}
             </button>
           </div>
@@ -198,11 +198,11 @@ function RecipeFormModal({ initial, onSave, onClose }) {
 
 function ConfirmDeleteModal({ recipe, onConfirm, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-panel sm:max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}>
         <div className="text-4xl mb-3">🗑️</div>
         <h3 className="font-semibold text-stone-800 mb-2">Delete Recipe?</h3>
-        <p className="text-sm text-stone-500 mb-6">"{recipe.name}" will be permanently deleted.</p>
+        <p className="text-sm text-stone-500 mb-6 break-words">"{recipe.name}" will be permanently deleted.</p>
         <div className="flex gap-3 justify-center">
           <button onClick={onClose} className="btn-ghost">Cancel</button>
           <button onClick={onConfirm} className="btn bg-red-500 hover:bg-red-600 text-white">Delete</button>
@@ -283,6 +283,80 @@ export default function RecipesPage() {
     }
   }
 
+  // Play / download / edit / delete buttons — shared by the table and phone cards
+  const renderActions = r => {
+    const dl = dlState[r.id] || 'idle'
+    const canEmbed = !!embedUrl(r.url)
+    return (
+      <div className="flex items-center justify-end gap-1">
+        {/* Play */}
+        <button
+          onClick={() => setPlayRecipe(r)}
+          title={canEmbed ? 'Play embedded video' : 'Open link'}
+          className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-0 flex items-center justify-center ${canEmbed ? 'text-orange-500 hover:bg-orange-100' : 'text-stone-300 hover:bg-stone-100'}`}
+        >
+          {canEmbed ? (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          )}
+        </button>
+
+        {/* Download */}
+        <button
+          onClick={() => dl === 'idle' && handleDownload(r)}
+          title={dl === 'done' ? 'Download started!' : dl === 'error' ? 'Download failed' : 'Download to server'}
+          className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-0 flex items-center justify-center ${
+            dl === 'done' ? 'text-green-500 hover:bg-green-50' :
+            dl === 'error' ? 'text-red-400 hover:bg-red-50' :
+            dl === 'loading' ? 'text-stone-400 cursor-wait' :
+            'text-stone-400 hover:bg-stone-100 hover:text-stone-600'
+          }`}
+        >
+          {dl === 'loading' ? (
+            <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          ) : dl === 'done' ? (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          )}
+        </button>
+
+        {/* Edit */}
+        <button
+          onClick={() => setEditRecipe(r)}
+          title="Edit"
+          className="p-2 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-0 flex items-center justify-center"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        </button>
+
+        {/* Delete */}
+        <button
+          onClick={() => setDeleteRecipe(r)}
+          title="Delete"
+          className="p-2 rounded-lg text-stone-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-0 flex items-center justify-center"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </div>
+    )
+  }
+
   return (
     <Layout>
       {/* Page header */}
@@ -323,7 +397,7 @@ export default function RecipesPage() {
       </div>
 
       {/* Table */}
-      <div className="card overflow-x-auto">
+      <div className="card md:overflow-x-auto">
         {loading ? (
           <div className="py-16 text-center text-stone-400">Loading recipes…</div>
         ) : error ? (
@@ -333,7 +407,30 @@ export default function RecipesPage() {
             {search ? `No recipes matching "${search}"` : 'No recipes yet — add your first one!'}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Phone: card list */}
+          <ul className="md:hidden divide-y divide-stone-100 -my-2">
+            {filtered.map(r => (
+              <li key={r.id} className="py-3">
+                <p className="font-medium text-stone-800 break-words">{r.name}</p>
+                <a
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-orange-600 mt-0.5 min-w-0"
+                  title={r.url}
+                >
+                  <span className="shrink-0">{platformIcon(r.url)}</span>
+                  <span className="truncate">{r.url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                </a>
+                {r.notes && <p className="text-xs text-stone-500 mt-1 line-clamp-2">{r.notes}</p>}
+                <div className="mt-1 -mr-2">{renderActions(r)}</div>
+              </li>
+            ))}
+          </ul>
+
+          {/* Tablet / laptop: table */}
+          <table className="w-full text-sm hidden md:table">
             <thead>
               <tr className="border-b border-stone-100 text-left text-stone-500 text-xs uppercase tracking-wide">
                 <th className="pb-3 pr-3 pl-2 font-medium w-[30%]">Recipe Name</th>
@@ -344,8 +441,6 @@ export default function RecipesPage() {
             </thead>
             <tbody className="divide-y divide-stone-50">
               {filtered.map(r => {
-                const dl = dlState[r.id] || 'idle'
-                const canEmbed = !!embedUrl(r.url)
                 return (
                   <tr key={r.id} className="hover:bg-orange-50/40 transition-colors group">
                     <td className="py-3 pr-3 pl-2">
@@ -369,78 +464,14 @@ export default function RecipesPage() {
                       <span className="line-clamp-2">{r.notes || <span className="italic text-stone-300">—</span>}</span>
                     </td>
                     <td className="py-3 pr-2">
-                      <div className="flex items-center justify-end gap-1">
-                        {/* Play */}
-                        <button
-                          onClick={() => setPlayRecipe(r)}
-                          title={canEmbed ? 'Play embedded video' : 'Open link'}
-                          className={`p-2 rounded-lg transition-colors min-h-[36px] ${canEmbed ? 'text-orange-500 hover:bg-orange-100' : 'text-stone-300 hover:bg-stone-100'}`}
-                        >
-                          {canEmbed ? (
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
-                          ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                          )}
-                        </button>
-
-                        {/* Download */}
-                        <button
-                          onClick={() => dl === 'idle' && handleDownload(r)}
-                          title={dl === 'done' ? 'Download started!' : dl === 'error' ? 'Download failed' : 'Download to server'}
-                          className={`p-2 rounded-lg transition-colors min-h-[36px] ${
-                            dl === 'done' ? 'text-green-500 hover:bg-green-50' :
-                            dl === 'error' ? 'text-red-400 hover:bg-red-50' :
-                            dl === 'loading' ? 'text-stone-400 cursor-wait' :
-                            'text-stone-400 hover:bg-stone-100 hover:text-stone-600'
-                          }`}
-                        >
-                          {dl === 'loading' ? (
-                            <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                          ) : dl === 'done' ? (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                          )}
-                        </button>
-
-                        {/* Edit */}
-                        <button
-                          onClick={() => setEditRecipe(r)}
-                          title="Edit"
-                          className="p-2 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors min-h-[36px]"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-
-                        {/* Delete */}
-                        <button
-                          onClick={() => setDeleteRecipe(r)}
-                          title="Delete"
-                          className="p-2 rounded-lg text-stone-400 hover:bg-red-50 hover:text-red-500 transition-colors min-h-[36px]"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
+                      {renderActions(r)}
                     </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+          </>
         )}
       </div>
 

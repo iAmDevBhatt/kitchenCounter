@@ -31,15 +31,23 @@
     transition: background-color 0.3s ease;
   }
 
-  h1 { @apply text-3xl font-bold tracking-tight; }
+  h1 { @apply text-2xl sm:text-3xl font-bold tracking-tight; }
   h2 { @apply text-2xl font-semibold tracking-tight; }
   h3 { @apply text-lg font-semibold; }
+
+  /* iOS Safari auto-zooms the page when focusing a field whose font-size is
+     under 16px, and doesn't zoom back out. Keep form fields at 16px on phones. */
+  @media (max-width: 639px) {
+    input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea { font-size: 16px !important; }
+  }
 }
 
 @layer components {
   /* Cards */
   .card {
-    @apply bg-white rounded-2xl shadow-sm p-6;
+    @apply bg-white rounded-2xl shadow-sm p-4 sm:p-6;
     border: 1px solid color-mix(in srgb, var(--theme-primary) 20%, transparent);
   }
   .card-sm {
@@ -111,9 +119,24 @@
   }
   .td          { @apply px-4 py-3 text-stone-700 border-t border-stone-100; }
 
+  /* Modals — bottom sheet on phones, centred dialog from sm up */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm;
+  }
+  .modal-panel {
+    @apply bg-white shadow-2xl w-full flex flex-col rounded-t-2xl sm:rounded-2xl max-h-[92dvh] sm:max-h-[90vh];
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Tab strip — single scrollable row on phones, wraps from sm up */
+  .tab-bar {
+    @apply flex gap-2 overflow-x-auto flex-nowrap sm:flex-wrap -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide;
+  }
+  .tab-bar > * { @apply shrink-0 whitespace-nowrap; }
+
   /* Nav tabs */
   .tab {
-    @apply px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150 cursor-pointer;
+    @apply inline-flex items-center gap-1.5 px-4 py-2 min-h-[40px] text-sm font-medium rounded-lg transition-all duration-150 cursor-pointer;
   }
   .tab-active {
     @apply tab text-white shadow-sm;
@@ -131,6 +154,12 @@
     @apply min-h-screen p-6;
     background-color: var(--theme-background);
   }
-  .page-title    { @apply text-2xl font-bold text-stone-900 mb-1; }
+  .page-title    { @apply text-xl sm:text-2xl font-bold text-stone-900 mb-1; }
   .page-subtitle { @apply text-sm text-stone-500 mb-6; }
+}
+
+@layer utilities {
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 }

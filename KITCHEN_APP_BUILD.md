@@ -96,6 +96,16 @@
   - `Dockerfile`: added `wget`, `ffmpeg`, `python3-pip`, and `yt-dlp` to the runtime stage. Added `/app/backend/static/downloads` directory creation.
   - `docker-compose.yml`: added `DOWNLOAD_DIR` env var and `downloads_data` named volume mapped to `/app/backend/static/downloads`.
   - `.env`: added `DOWNLOAD_DIR=backend/static/downloads` for local dev.
+- **Session 11 (2026-09-23) — Phone (mobile) layout + PWA install polish:**
+  - `Layout.jsx`: the horizontal mobile nav strip is replaced by a fixed **bottom tab bar** (4 main pages + "More" sheet with Configuration / Theme / Logout); brand text is always shown; the header logout is `md+` only.
+  - `index.css`: new `.modal-overlay` / `.modal-panel` (bottom sheet on phones), `.tab-bar` (swipeable single-row tabs), `.scrollbar-hide` (was referenced but never defined), `.pb-safe`; 16px form fields below 640px (stops iOS focus-zoom); smaller `.card` padding and page titles on phones.
+  - `InventoryTable`: phone **card list** (`md:hidden`) with usage slider + Edit/Delete; table is `md+` only; filters go full width; item modal is a bottom sheet with a scrollable tab row.
+  - `BulkImportExport`: Export dropdown anchored left on phones (it was going off-screen).
+  - `KitchenSlabPage`: inventory table hides Category/Usage on phones; `MealPrepModal` is a full-height bottom sheet; **tap-to-add** 🌅/☀️/🌙 buttons per item on phones; touch drag now needs a **300 ms long-press** (a swipe scrolls the list — before, any swipe started a drag).
+  - `RecipesPage`: phone card list; action buttons pulled into `renderActions(r)` (44px tap targets on phones); modals are bottom sheets.
+  - `UserManagement`: Email/Joined columns hidden on phones (email shown under the username). `ConfigurationPage`/`InventoryPage` tabs use `.tab-bar`.
+  - Fixed double-encoded characters (`Addingâ€¦` → `Adding…`) in `TagManager`, `UserManagement`, `StorageLocationManager`.
+  - PWA: added `apple-touch-icon.png` (180), `icon-192.png`, `icon-512.png`; manifest gets PNG icons + `id`/`scope`/`orientation`; `index.html` gets iOS standalone meta tags + `viewport-fit=cover`.
 
 ### ⚠️ Deviations from spec / known issues
 - **Database:** SQLite used for dev AND optionally production (intentional user decision). PostgreSQL available via Docker profile. **Alembic is now wired up** — `alembic upgrade head` runs on Docker startup; `create_all()` kept only as a local-dev fallback in `init_db.py`.
@@ -106,7 +116,7 @@
 - **`/ai-insights/mcp` route:** Missing — `AIInsightsPanel` calls it but it doesn't exist in `ai_insights.py`.
 - **`AIInsightsPanel` import:** Imports `../../api/client` — should be `../../api/index.js`.
 - **No `__init__.py`:** Relative imports work because `PYTHONPATH` is set in `main.py`.
-- **PWA:** `vite-plugin-pwa` not installed (service worker not configured). `manifest.json` is present with Web Share Target for mobile sharing — install button and offline support require the plugin.
+- **PWA:** installable via "Add to Home Screen" (manifest + PNG icons + iOS meta tags). `vite-plugin-pwa` is not installed, so there's no service worker or offline support. The Android install prompt and share target also need the app served over HTTPS.
 - **shadcn/ui + @dnd-kit:** Not installed. UI is raw Tailwind; drag-and-drop uses a custom mouse-event system (not HTML5 drag API and not @dnd-kit).
 - **Zustand store:** Not created. State is local `useState` + `ThemeContext`.
 

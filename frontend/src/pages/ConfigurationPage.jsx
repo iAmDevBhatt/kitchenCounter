@@ -19,12 +19,12 @@ export default function ConfigurationPage() {
 
   return (
     <Layout>
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <h1 className="page-title">Configuration</h1>
         <p className="page-subtitle">Manage categories, tags, storage locations, and users</p>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="tab-bar mb-4 sm:mb-6">
         {TABS.map(t => (
           <button
             key={t.key}

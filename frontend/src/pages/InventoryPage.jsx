@@ -27,23 +27,23 @@ export default function InventoryPage() {
   return (
     <Layout>
       {/* Page header */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <h1 className="page-title">{getLabel('page.inventory.title')}</h1>
         <p className="page-subtitle">Manage your kitchen stock and usage</p>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
         {STAT_CARDS.map(s => (
-          <div key={s.label} className={`rounded-2xl border p-4 ${s.color}`}>
-            <p className={`text-2xl font-bold ${s.text}`}>{s.value}</p>
-            <p className="text-sm text-stone-500 mt-0.5">{s.label}</p>
+          <div key={s.label} className={`rounded-2xl border p-3 sm:p-4 ${s.color}`}>
+            <p className={`text-xl sm:text-2xl font-bold ${s.text}`}>{s.value}</p>
+            <p className="text-xs sm:text-sm text-stone-500 mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="tab-bar mb-4">
         {TABS.map(t => (
           <button
             key={t.key}
@@ -58,19 +58,19 @@ export default function InventoryPage() {
 
       {/* Table card */}
       <div className="card p-0 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-orange-50">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-orange-50">
           <h2 className="text-base font-semibold text-stone-800 flex items-center gap-2">
             <span className={tab.color}>{tab.icon}</span>
             {tab.key === 'all' ? 'All Items' : getLabel(tab.label)}
           </h2>
-          <button className="btn-primary" onClick={() => setShowAdd(true)}>
+          <button className="btn-primary shrink-0" onClick={() => setShowAdd(true)}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             {getLabel('btn.add.item')}
           </button>
         </div>
-        <div className="p-4">
+        <div className="p-3 sm:p-4">
           <InventoryTable
             statusFilter={tab.filter}
             showAllFilters={!!tab.showAllFilters}

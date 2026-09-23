@@ -294,7 +294,7 @@ export default function BulkImportExport({ items, catMap, locMap, onDone }) {
             </svg>
           </button>
           {exportOpen && (
-            <div className="absolute right-0 mt-1 w-36 bg-white border border-stone-200 rounded-xl shadow-lg z-20 overflow-hidden">
+            <div className="absolute left-0 sm:left-auto sm:right-0 mt-1 w-36 bg-white border border-stone-200 rounded-xl shadow-lg z-20 overflow-hidden">
               <button className="w-full text-left px-4 py-2.5 text-sm hover:bg-orange-50 text-stone-700 flex items-center gap-2"
                 onClick={() => handleExport('xlsx')}>
                 <span className="text-green-600 font-bold text-xs">XLS</span> Excel (.xlsx)

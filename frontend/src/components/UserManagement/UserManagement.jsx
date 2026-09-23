@@ -102,7 +102,7 @@ export default function UserManagement() {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={handleAdd} disabled={adding} className="btn-primary disabled:opacity-60">
-            {adding ? 'Addingâ€¦' : '+ Add User'}
+            {adding ? 'Adding…' : '+ Add User'}
           </button>
           {addError && <p className="text-red-600 text-xs">{addError}</p>}
         </div>
@@ -110,7 +110,7 @@ export default function UserManagement() {
 
       {/* User table */}
       {loading ? (
-        <div className="text-center py-8 text-stone-400 text-sm">Loading usersâ€¦</div>
+        <div className="text-center py-8 text-stone-400 text-sm">Loading users…</div>
       ) : error ? (
         <div className="text-center py-8 text-red-500 text-sm">{error}</div>
       ) : users.length === 0 ? (
@@ -121,9 +121,9 @@ export default function UserManagement() {
             <thead>
               <tr>
                 <th className="th">Username</th>
-                <th className="th">Email</th>
+                <th className="th hidden sm:table-cell">Email</th>
                 <th className="th">Status</th>
-                <th className="th">Joined</th>
+                <th className="th hidden sm:table-cell">Joined</th>
                 <th className="th">Actions</th>
               </tr>
             </thead>
@@ -138,33 +138,35 @@ export default function UserManagement() {
                       {isSelf && (
                         <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600 border border-orange-200">you</span>
                       )}
+                      {/* Email column is hidden on phones — show it under the username */}
+                      <p className="sm:hidden text-xs text-stone-400 break-all">{user.email}</p>
                     </td>
-                    <td className="td text-stone-500 text-sm">{user.email}</td>
+                    <td className="td text-stone-500 text-sm hidden sm:table-cell">{user.email}</td>
                     <td className="td">
                       {user.is_active
                         ? <span className="badge-green">Active</span>
                         : <span className="badge-red">Inactive</span>
                       }
                     </td>
-                    <td className="td text-stone-400 text-sm">
-                      {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'â€”'}
+                    <td className="td text-stone-400 text-sm hidden sm:table-cell">
+                      {user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
                     </td>
                     <td className="td">
                       {isDeleting ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs text-red-600">Delete "{user.username}"?</span>
                           <button onClick={() => handleDelete(user.id)} className="btn-danger text-xs px-3 min-h-[36px]">Yes</button>
                           <button onClick={() => setDeleteId(null)} className="btn-secondary text-xs px-3 min-h-[36px]">No</button>
                         </div>
                       ) : (
-                        <div className="flex gap-1.5">
+                        <div className="flex flex-wrap gap-1.5">
                           <button
                             onClick={() => handleToggle(user)}
                             disabled={toggling === user.id || isSelf}
                             title={isSelf ? "Can't deactivate yourself" : ''}
                             className="btn-secondary text-xs px-3 min-h-[36px] disabled:opacity-40"
                           >
-                            {toggling === user.id ? 'â€¦' : user.is_active ? 'Deactivate' : 'Activate'}
+                            {toggling === user.id ? '…' : user.is_active ? 'Deactivate' : 'Activate'}
                           </button>
                           <button
                             onClick={() => setDeleteId(user.id)}

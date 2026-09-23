@@ -101,11 +101,11 @@ export default function TagManager() {
             onChange={e => { setNewName(e.target.value); setAddError('') }}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
           />
-          <select className="input w-auto" value={newType} onChange={e => setNewType(e.target.value)}>
+          <select className="input sm:w-auto" value={newType} onChange={e => setNewType(e.target.value)}>
             {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
           </select>
           <button onClick={handleAdd} disabled={adding} className="btn-primary whitespace-nowrap disabled:opacity-60">
-            {adding ? 'Addingâ€¦' : '+ Add Tag'}
+            {adding ? 'Adding…' : '+ Add Tag'}
           </button>
         </div>
         {addError && <p className="text-red-600 text-xs mt-2">{addError}</p>}
@@ -113,7 +113,7 @@ export default function TagManager() {
 
       {/* Tag list */}
       {loading ? (
-        <div className="text-center py-8 text-stone-400 text-sm">Loading tagsâ€¦</div>
+        <div className="text-center py-8 text-stone-400 text-sm">Loading tags…</div>
       ) : error ? (
         <div className="text-center py-8 text-red-500 text-sm">{error}</div>
       ) : tags.length === 0 ? (
@@ -159,7 +159,7 @@ export default function TagManager() {
                     {editId === tag.id ? (
                       <div className="flex gap-1.5">
                         <button onClick={handleSaveEdit} disabled={saving} className="btn-primary text-xs py-1 px-2 disabled:opacity-60">
-                          {saving ? 'â€¦' : 'Save'}
+                          {saving ? '…' : 'Save'}
                         </button>
                         <button onClick={() => setEditId(null)} className="btn-secondary text-xs px-3 min-h-[36px]">Cancel</button>
                       </div>

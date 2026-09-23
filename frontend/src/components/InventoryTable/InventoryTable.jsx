@@ -346,23 +346,23 @@ function ItemModal({ item, categories, locations, onSave, onClose }) {
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+    <div className="modal-overlay">
+      <div className="modal-panel sm:max-w-lg">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-stone-100">
-          <h3 className="text-lg font-semibold text-stone-800">
+        <div className="flex items-center justify-between gap-2 px-4 sm:px-6 pt-3 sm:pt-5 pb-3 sm:pb-4 border-b border-stone-100">
+          <h3 className="text-lg font-semibold text-stone-800 truncate">
             {isEdit ? `Edit — ${item.item_name}` : 'Add Inventory Item'}
           </h3>
-          <button onClick={onClose} className="w-11 h-11 flex items-center justify-center rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 text-xl transition-colors">✕</button>
+          <button onClick={onClose} className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 text-xl transition-colors">✕</button>
         </div>
 
         {/* Tab bar */}
-        <div className="flex gap-1 px-6 pt-3">
+        <div className="flex gap-1 px-4 sm:px-6 pt-3 overflow-x-auto scrollbar-hide">
           {TABS.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors
+              className={`shrink-0 whitespace-nowrap text-xs px-3 py-2 sm:py-1.5 rounded-lg font-medium transition-colors
                 ${tab === t.key ? 'bg-orange-100 text-orange-700' : 'text-stone-500 hover:bg-stone-100'}`}
             >
               {t.label}
@@ -371,13 +371,13 @@ function ItemModal({ item, categories, locations, onSave, onClose }) {
         </div>
 
         {error && (
-          <div className="mx-6 mt-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
+          <div className="mx-4 sm:mx-6 mt-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
             {error}
           </div>
         )}
 
         {/* Body */}
-        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+        <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-4 space-y-4">
           {tab === 'basic' && (
             <div className="grid grid-cols-2 gap-3">
               {/* Image upload spans full width */}
@@ -545,9 +545,9 @@ function ItemModal({ item, categories, locations, onSave, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2 justify-end px-6 py-4 border-t border-stone-100">
-          <button onClick={onClose} className="btn-secondary">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-60">
+        <div className="flex gap-2 justify-end px-4 sm:px-6 py-3 sm:py-4 border-t border-stone-100">
+          <button onClick={onClose} className="btn-secondary flex-1 sm:flex-none justify-center">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 sm:flex-none justify-center disabled:opacity-60">
             {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Item'}
           </button>
         </div>
@@ -559,9 +559,9 @@ function ItemModal({ item, categories, locations, onSave, onClose }) {
 // ── Delete confirm ────────────────────────────────────────────────────────────
 function DeleteConfirm({ item, onConfirm, onCancel }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-        <h3 className="text-lg font-semibold text-stone-800 mb-2">Delete "{item.item_name}"?</h3>
+    <div className="modal-overlay">
+      <div className="modal-panel sm:max-w-sm p-6">
+        <h3 className="text-lg font-semibold text-stone-800 mb-2 break-words">Delete "{item.item_name}"?</h3>
         <p className="text-sm text-stone-500 mb-4">This action cannot be undone.</p>
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="btn-secondary">Cancel</button>
@@ -759,14 +759,14 @@ export default function InventoryTable({ statusFilter, showAllFilters, onStatsCh
     <div>
       {/* Filter bar */}
       <div className="flex flex-col gap-3 mb-4">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
             </svg>
             <input className="input pl-9" placeholder="Search items…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <select className="input w-auto" value={catFilter} onChange={e => setCatFilter(e.target.value)}>
+          <select className="input sm:w-auto" value={catFilter} onChange={e => setCatFilter(e.target.value)}>
             <option value="all">All Categories</option>
             {categories.map(c => (
               <option key={c.id} value={c.id}>{'— '.repeat(c.depth - 1)}{c.name}</option>
@@ -778,18 +778,18 @@ export default function InventoryTable({ statusFilter, showAllFilters, onStatsCh
         {showAllFilters && (
           <div className="flex flex-col sm:flex-row gap-3 p-3 bg-stone-50 rounded-xl border border-stone-100">
             <div className="flex items-center gap-2 flex-1">
-              <label className="text-xs text-stone-500 whitespace-nowrap font-medium">Status</label>
+              <label className="text-xs text-stone-500 whitespace-nowrap font-medium w-20 sm:w-auto">Status</label>
               <select className="input flex-1" value={statusEx} onChange={e => setStatusEx(e.target.value)}>
                 <option value="all">All Statuses</option>
                 {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2 flex-1">
-              <label className="text-xs text-stone-500 whitespace-nowrap font-medium">Expiry from</label>
+              <label className="text-xs text-stone-500 whitespace-nowrap font-medium w-20 sm:w-auto">Expiry from</label>
               <input type="date" className="input flex-1" value={expiryFrom} onChange={e => setExpiryFrom(e.target.value)} />
             </div>
             <div className="flex items-center gap-2 flex-1">
-              <label className="text-xs text-stone-500 whitespace-nowrap font-medium">to</label>
+              <label className="text-xs text-stone-500 whitespace-nowrap font-medium w-20 sm:w-auto">to</label>
               <input type="date" className="input flex-1" value={expiryTo} onChange={e => setExpiryTo(e.target.value)} />
             </div>
             {(statusEx !== 'all' || expiryFrom || expiryTo) && (
@@ -804,8 +804,58 @@ export default function InventoryTable({ statusFilter, showAllFilters, onStatsCh
         )}
       </div>
 
-      {/* Table */}
-      <div className="table-wrap">
+      {/* Phone: card list */}
+      <ul className="md:hidden space-y-2">
+        {visible.map(item => {
+          const exp = expiryInfo(item.expiration_date)
+          const pct = item.usage_percentage || 0
+          return (
+            <li key={item.id} className="rounded-xl border border-stone-200 bg-white p-3">
+              <div className="flex items-start gap-3">
+                <ItemThumb path={item.item_image_path} name={item.item_name} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium text-stone-800 break-words min-w-0">{item.item_name}</p>
+                    <span className={`${STATUS_BADGE[item.status] ?? 'badge-stone'} shrink-0`}>{item.status}</span>
+                  </div>
+                  <p className="text-xs text-stone-500 mt-0.5 truncate">
+                    {catMap[item.category_id] || '—'}
+                    {item.stored_location_id && <> · 📍 {locMap[item.stored_location_id] || '—'}</>}
+                  </p>
+                  <p className="text-xs mt-0.5">
+                    <span className="text-stone-500">Qty <span className="font-medium text-stone-700">{item.quantity ?? '—'}</span></span>
+                    <span className="text-stone-300"> · </span>
+                    <span className={exp.cls}>{item.expiration_date ? exp.label : 'No expiry'}</span>
+                  </p>
+                  {item._tags?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {item._tags.map(t => (
+                        <span key={t.id} className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                          {t.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="text-xs text-stone-500 shrink-0">Usage</span>
+                <input type="range" min="0" max="100" value={pct}
+                  onChange={e => updateUsage(item, parseInt(e.target.value))}
+                  className="flex-1 h-6 accent-orange-500" />
+                <span className="text-xs text-stone-600 w-9 text-right">{pct}%</span>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button onClick={() => setEditItem(item)} className="btn-secondary text-xs flex-1 justify-center min-h-[40px]">Edit</button>
+                <button onClick={() => setDeleteItem(item)} className="btn-danger text-xs flex-1 justify-center min-h-[40px]">Delete</button>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+
+      {/* Tablet / laptop: table */}
+      <div className="table-wrap hidden md:block">
         <table className="table">
           <thead>
             <tr>

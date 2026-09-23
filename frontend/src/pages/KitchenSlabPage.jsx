@@ -127,14 +127,14 @@ function DayDetail({ row, onEdit, onDelete, onClose }) {
         onClick={onClose}
       />
       {/* Panel — slides in from right */}
-      <div className="fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 bg-white shadow-2xl flex flex-col overflow-hidden">
+      <div className="fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 bg-white shadow-2xl flex flex-col overflow-hidden pb-safe">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-orange-100 shrink-0">
+        <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3 sm:py-4 border-b border-orange-100 shrink-0">
           <div>
             <p className="text-xs text-stone-400 uppercase tracking-wide font-semibold">Meal Plan</p>
             <h2 className="text-xl font-bold text-stone-800">Day {row.day}</h2>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5 sm:gap-2">
             <button onClick={() => onEdit(row)}   className="btn-secondary text-xs min-h-[36px] px-3">Edit</button>
             <button onClick={() => onDelete(row)} className="btn-danger   text-xs min-h-[36px] px-3">Delete</button>
             <button onClick={onClose} className="w-11 h-11 flex items-center justify-center rounded-xl btn-ghost">
@@ -239,7 +239,7 @@ function MealDropZone({ mealName, meal, onChange, activeOver }) {
         <select
           value={meal.status}
           onChange={e => onChange({ ...meal, status: e.target.value })}
-          className="input w-28 py-1 text-xs"
+          className="input w-32 sm:w-28 py-1 text-xs"
         >
           {STATUS_OPTS.map(s => <option key={s}>{s}</option>)}
         </select>
@@ -257,7 +257,7 @@ function MealDropZone({ mealName, meal, onChange, activeOver }) {
           type="button"
           onClick={() => setShowRecipePicker(true)}
           title="Browse saved recipes"
-          className="shrink-0 px-2 py-1 rounded-lg bg-orange-50 border border-orange-200 text-orange-600 hover:bg-orange-100 transition-colors text-xs flex items-center gap-1"
+          className="shrink-0 px-3 min-w-[44px] justify-center rounded-lg bg-orange-50 border border-orange-200 text-orange-600 hover:bg-orange-100 transition-colors text-xs flex items-center gap-1"
         >
           <span>📖</span>
           <span className="hidden sm:inline">Recipes</span>
@@ -318,6 +318,7 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
   const pendingRef  = useRef(null)   // { item, startX, startY } before threshold
   const draggingRef = useRef(null)   // mirrors dragging state for use inside listeners
   const activeRef   = useRef(null)   // mirrors activeOver for use inside listeners
+  const holdTimerRef = useRef(null)  // touch long-press timer that starts a drag
 
   draggingRef.current = dragging
   activeRef.current   = activeOver
@@ -336,6 +337,15 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
       if (pendingRef.current && !draggingRef.current) {
         const dx = cx - pendingRef.current.startX
         const dy = cy - pendingRef.current.startY
+        // Touch drags start from the long-press timer instead; moving before
+        // it fires means the finger is scrolling the list, so let go of it.
+        if (pendingRef.current.touch) {
+          if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+            clearTimeout(holdTimerRef.current)
+            pendingRef.current = null
+          }
+          return
+        }
         if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return
         const newDrag = { item: pendingRef.current.item, x: cx, y: cy }
         draggingRef.current = newDrag
@@ -357,6 +367,7 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
     }
 
     const handleUp = () => {
+      clearTimeout(holdTimerRef.current)
       const d = draggingRef.current
       const a = activeRef.current
       if (d && a) {
@@ -378,7 +389,7 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
 
     const onTouchMove = (e) => {
       if (!pendingRef.current && !draggingRef.current) return
-      e.preventDefault()  // prevent page scroll while dragging
+      if (draggingRef.current) e.preventDefault()  // prevent page scroll while dragging
       const t = e.touches[0]
       handleMove(t.clientX, t.clientY)
     }
@@ -389,6 +400,7 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
     document.addEventListener('touchmove', onTouchMove, { passive: false })
     document.addEventListener('touchend',  onTouchEnd)
     return () => {
+      clearTimeout(holdTimerRef.current)
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup',   onMouseUp)
       document.removeEventListener('touchmove', onTouchMove)
@@ -404,8 +416,27 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
 
   const onItemTouchStart = (e, item) => {
     const t = e.touches[0]
-    pendingRef.current = { item, startX: t.clientX, startY: t.clientY }
-    // No preventDefault here — allows tap/scroll until drag threshold is crossed
+    pendingRef.current = { item, startX: t.clientX, startY: t.clientY, touch: true }
+    // No preventDefault here — a quick swipe still scrolls the list. Holding
+    // still for 300ms picks the item up.
+    clearTimeout(holdTimerRef.current)
+    holdTimerRef.current = setTimeout(() => {
+      const p = pendingRef.current
+      if (!p?.touch || draggingRef.current) return
+      const d = { item: p.item, x: p.startX, y: p.startY }
+      draggingRef.current = d
+      setDragging(d)
+      navigator.vibrate?.(15)
+    }, 300)
+  }
+
+  // Tap-to-add alternative to dragging (shown on phones)
+  const addToMeal = (mealName, item) => {
+    setMeals(prev => {
+      const meal = prev[mealName]
+      if (meal.items.find(i => i.id === item.id)) return prev
+      return { ...prev, [mealName]: { ...meal, items: [...meal.items, item] } }
+    })
   }
 
   const handleSave = () => {
@@ -417,10 +448,10 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col">
+    <div className="modal-overlay">
+      <div className="modal-panel sm:max-w-4xl sm:rounded-3xl h-[92dvh] sm:h-auto">
         {/* header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-orange-100">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-orange-100">
           <h2 className="text-lg font-semibold text-stone-800">
             {row ? `Edit Day ${row.day}` : 'Add Meal Plan'}
           </h2>
@@ -437,7 +468,8 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
           <div className="md:w-60 md:shrink-0 border-b md:border-b-0 md:border-r border-orange-100 p-4 flex flex-col gap-3 overflow-y-auto md:max-h-none max-h-52">
             <div>
               <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">Inventory</p>
-              <p className="text-xs text-stone-400 mb-2">Drag items into a meal →</p>
+              <p className="text-xs text-stone-400 mb-2 hidden md:block">Drag items into a meal →</p>
+              <p className="text-xs text-stone-400 mb-2 md:hidden">Tap a meal icon to add, or long-press &amp; drag ↓</p>
               <select className="input text-xs py-1" value={invFilter} onChange={e => setInvFilter(e.target.value)}>
                 {cats.map(c => <option key={c}>{c}</option>)}
               </select>
@@ -451,7 +483,7 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
                     key={item.id}
                     onMouseDown={e => onItemMouseDown(e, payload)}
                     onTouchStart={e => onItemTouchStart(e, payload)}
-                    className={`flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-2 cursor-grab hover:bg-orange-100 transition-colors select-none
+                    className={`flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-2 cursor-grab hover:bg-orange-100 transition-colors select-none [-webkit-touch-callout:none]
                       ${isDragging ? 'opacity-40' : ''}`}
                   >
                     <div className="min-w-0 flex-1">
@@ -459,6 +491,26 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
                       <p className="text-[10px] text-stone-400 truncate">{catMap[item.category_id] || ''}</p>
                     </div>
                     <span className={`${INV_STATUS_BADGE[item.status]} text-[9px] ml-1 flex-shrink-0`}>{item.status}</span>
+                    {/* Phone: tap-to-add buttons. Stop propagation so a tap never seeds a drag. */}
+                    <div className="flex gap-1 ml-2 md:hidden"
+                      onMouseDown={e => e.stopPropagation()}
+                      onTouchStart={e => e.stopPropagation()}>
+                      {MEALS.map(m => {
+                        const added = meals[m].items.some(i => i.id === item.id)
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            title={`Add to ${m}`}
+                            onClick={() => addToMeal(m, payload)}
+                            className={`w-9 h-9 rounded-lg border text-base flex items-center justify-center transition-colors
+                              ${added ? 'bg-orange-500 border-orange-500' : 'bg-white border-orange-200 active:bg-orange-100'}`}
+                          >
+                            {MEAL_ICONS[m]}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
                 )
               })}
@@ -469,7 +521,7 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
           </div>
 
           {/* RIGHT: meal drop zones */}
-          <div className="flex-1 p-5 overflow-y-auto flex flex-col gap-3">
+          <div className="flex-1 min-h-0 p-3 sm:p-5 overflow-y-auto flex flex-col gap-3">
             {!row && (
               <div className="flex items-center gap-3">
                 <label className="label mb-0 whitespace-nowrap">Day of month</label>
@@ -495,9 +547,9 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
         </div>
 
         {/* footer */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-orange-100">
-          <button onClick={onClose} className="btn-secondary">Cancel</button>
-          <button onClick={handleSave} className="btn-primary">
+        <div className="flex justify-end gap-2 px-4 sm:px-6 py-3 sm:py-4 border-t border-orange-100">
+          <button onClick={onClose} className="btn-secondary flex-1 sm:flex-none justify-center">Cancel</button>
+          <button onClick={handleSave} className="btn-primary flex-1 sm:flex-none justify-center">
             {row ? 'Save Changes' : 'Add Meal Plan'}
           </button>
         </div>
@@ -520,8 +572,8 @@ function MealPrepModal({ row, inventory, catMap, onSave, onClose }) {
 // ── Delete confirmation ───────────────────────────────────────────────────────
 function ConfirmDelete({ day, onConfirm, onCancel }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full">
+    <div className="modal-overlay">
+      <div className="modal-panel sm:max-w-sm p-6">
         <h3 className="text-lg font-semibold text-stone-800 mb-2">Delete Day {day}?</h3>
         <p className="text-sm text-stone-500 mb-5">This will remove all meal plans for day {day}. This cannot be undone.</p>
         <div className="flex gap-2 justify-end">
@@ -635,7 +687,7 @@ export default function KitchenSlabPage() {
 
           {/* Category filter */}
           <select
-            className="input w-auto text-sm"
+            className="input sm:w-auto text-sm"
             value={catFilter}
             onChange={e => setCatFilter(e.target.value)}
           >
@@ -644,7 +696,7 @@ export default function KitchenSlabPage() {
 
           {/* Status filter */}
           <select
-            className="input w-auto text-sm"
+            className="input sm:w-auto text-sm"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
           >
@@ -679,10 +731,10 @@ export default function KitchenSlabPage() {
             <thead>
               <tr>
                 <th className="th">Item</th>
-                <th className="th">Category</th>
+                <th className="th hidden sm:table-cell">Category</th>
                 <th className="th">Status</th>
                 <th className="th">Qty</th>
-                <th className="th">Usage</th>
+                <th className="th hidden sm:table-cell">Usage</th>
               </tr>
             </thead>
             <tbody>
@@ -694,13 +746,17 @@ export default function KitchenSlabPage() {
               )}
               {!invLoading && visibleInv.map(item => (
                 <tr key={item.id} className="hover:bg-orange-50/50 transition-colors">
-                  <td className="td font-medium text-stone-800">{item.item_name}</td>
-                  <td className="td text-stone-500 text-sm">{catMap[item.category_id] || '—'}</td>
+                  <td className="td font-medium text-stone-800">
+                    {item.item_name}
+                    {/* Category column is hidden on phones — show it under the name instead */}
+                    <p className="sm:hidden text-xs font-normal text-stone-400">{catMap[item.category_id] || '—'}</p>
+                  </td>
+                  <td className="td text-stone-500 text-sm hidden sm:table-cell">{catMap[item.category_id] || '—'}</td>
                   <td className="td">
                     <span className={INV_STATUS_BADGE[item.status] || 'badge-stone'}>{item.status}</span>
                   </td>
                   <td className="td text-stone-700">{item.quantity ?? '—'}</td>
-                  <td className="td">
+                  <td className="td hidden sm:table-cell">
                     <div className="flex items-center gap-2">
                       <div className="w-20 bg-orange-100 rounded-full h-1.5 flex-shrink-0">
                         <div
@@ -716,7 +772,7 @@ export default function KitchenSlabPage() {
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-stone-400 mt-2">💡 Tip: use the meal planner below — drag inventory items from the panel into meal slots</p>
+        <p className="text-xs text-stone-400 mt-2">💡 Tip: use the meal planner below — <span className="hidden md:inline">drag inventory items from the panel into meal slots</span><span className="md:hidden">tap a meal icon next to an item to add it</span></p>
       </div>
 
       {/* ══ SECTION 2: Monthly Meal Prep Table ══ */}
@@ -725,7 +781,7 @@ export default function KitchenSlabPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <h2 className="text-base font-semibold text-stone-800">📅 Monthly Meal Plan</h2>
           <div className="flex items-center gap-2 flex-wrap">
-            <select className="input w-auto text-sm py-1.5" value={month} onChange={e => setMonth(+e.target.value)}>
+            <select className="input flex-1 sm:flex-none sm:w-auto text-sm py-1.5" value={month} onChange={e => setMonth(+e.target.value)}>
               {MONTHS.map((m,i) => <option key={m} value={i+1}>{m}</option>)}
             </select>
             <select className="input w-24 text-sm py-1.5" value={year} onChange={e => setYear(+e.target.value)}>

@@ -1,6 +1,6 @@
 # KitchenCounter - AI Developer Reference
 
-> Last updated: 2026-09-11 (session 10). See `KITCHEN_APP_BUILD.md` §Implementation Status for full gap list.
+> Last updated: 2026-09-23 (session 11 — phone layout + PWA install polish). See `KITCHEN_APP_BUILD.md` §Implementation Status for full gap list.
 
 This document provides comprehensive technical documentation for developers working on the KitchenCounter application.
 
@@ -36,14 +36,25 @@ KitchenCounter is a Progressive Web App (PWA) with:
 | Routing | react-router-dom v7 |
 | HTTP | Axios (`frontend/src/api/index.js`) with `baseURL: '/api'` |
 | State | Local `useState`/`useEffect` + React Context (`ThemeContext`) for global theme |
-| Drag & drop | Mouse-event system (NO HTML5 drag API) — `onMouseDown`/`onTouchStart` + document-level `mousemove`/`mouseup`/`touchmove`/`touchend`, 4px threshold, refs avoid stale closures. Works on both mouse and touch (tablet/phone). |
+| Drag & drop | Mouse-event system (NO HTML5 drag API) — `onMouseDown`/`onTouchStart` + document-level `mousemove`/`mouseup`/`touchmove`/`touchend`, 4px threshold (mouse) / 300ms long-press (touch), refs avoid stale closures. Phones also get tap-to-add buttons. Works on both mouse and touch (tablet/phone). |
 | Charts | Recharts 3.x (`recharts`, `react-is` peer dep) — used by DietStatsPage |
 | Bulk import/export | `xlsx` (SheetJS) + `papaparse` — installed in `frontend/` |
-| PWA | Not yet configured (`vite-plugin-pwa` not installed) |
+| PWA | Installable (manifest + PNG icons + iOS meta tags). No service worker yet (`vite-plugin-pwa` not installed) — no offline support |
 
 ## Responsive Design & Touch Support
 
-The app is fully responsive — designed and tested for laptop, tablet, and mobile.
+The app is fully responsive — designed and tested for laptop, tablet, and phone (390px wide).
+
+### Phone patterns (below `md`, 768px)
+| Pattern | Where | Detail |
+|---|---|---|
+| Bottom tab bar | `Layout.jsx` | Fixed bottom nav: Diet & Stats, Inventory, Kitchen Slab, Recipes + **More** sheet (Configuration, Theme, Logout). `main` gets `pb-28` to clear it. Logout button in the header is `md+` only. |
+| Card lists instead of tables | `InventoryTable`, `RecipesPage` | `<ul className="md:hidden">` card list + `<table className="hidden md:table">` (or `table-wrap hidden md:block`). Keep both in sync when adding columns/actions. `RecipesPage` shares buttons through `renderActions(r)`. |
+| Hidden secondary columns | KitchenSlab inventory table, `UserManagement` | `hidden sm:table-cell` on Category/Usage and Email/Joined; the value is repeated under the name with `sm:hidden`. |
+| Bottom-sheet modals | `.modal-overlay` + `.modal-panel` in `index.css` | Slides up from the bottom on phones (`rounded-t-2xl`, `max-h-[92dvh]`, safe-area padding), centred dialog from `sm`. Add the width with `sm:max-w-*`. Used by the item, meal-prep, recipe and delete modals. |
+| Scrollable tab strip | `.tab-bar` in `index.css` | One swipeable row on phones, wraps from `sm`. Used on Inventory + Configuration. |
+| 16px form fields | `index.css` base layer | Below 640px every input/select/textarea is forced to 16px — iOS Safari zooms the page on focus when a field is smaller. |
+| Safe areas | `viewport-fit=cover` + `.pb-safe` utility | Bottom nav, sheets and the DayDetail slide-over pad for the iPhone home indicator. |
 
 ### Touch Targets
 - The `.btn` base class in `index.css` enforces `min-h-[44px]` on all buttons, meeting touch-target accessibility guidelines.
@@ -53,8 +64,8 @@ The app is fully responsive — designed and tested for laptop, tablet, and mobi
 ### Layout Breakpoints
 | Component | Mobile (< `md`) | Tablet/Desktop (`md`+) |
 |---|---|---|
-| `Layout` header | Logo icon only (text hidden), `gap-4` | Full "KitchenCounter" text, `gap-4 lg:gap-8` |
-| Mobile nav strip | `min-h-[44px]` touch links, horizontal scroll | Hidden (`md:hidden`) |
+| `Layout` header | Logo + "KitchenCounter" text, no nav links or logout (`h-14`) | Logo + inline nav + Logout (`h-16`) |
+| Bottom tab bar | Fixed bottom nav + More sheet | Hidden (`md:hidden`); top nav shown instead |
 | `MealPrepModal` body | Inventory panel on top (max-h-52, scrollable) + drop zones below | Side-by-side (`w-60` left + `flex-1` right) |
 | `DietStatsPage` MealStatusCharts | Single-column (`grid-cols-1`) | Two-column (`sm:grid-cols-2`) |
 | `AIInsightsPanel` | Full viewport width (`w-full`) | Fixed 320 px panel (`sm:w-80`) |
@@ -66,9 +77,12 @@ The app is fully responsive — designed and tested for laptop, tablet, and mobi
 ### Drag & Drop — Touch Support (KitchenSlabPage `MealPrepModal`)
 The drag system supports both mouse and touch:
 - `onMouseDown` / `onTouchStart` on each inventory row seed `pendingRef`.
-- Document-level `mousemove` + `touchmove` (passive: false) activate drag after 4 px threshold; update ghost position; hit-test `[data-dropzone]` via `elementFromPoint`.
+- **Mouse:** drag activates after a 4 px move.
+- **Touch:** drag activates after a **300 ms long-press** (`holdTimerRef`, with a short vibration). Moving more than 8 px before that cancels it, so a swipe still scrolls the inventory list. Before this change, any swipe over an item started a drag, so the list couldn't be scrolled on touch screens.
+- Document-level `mousemove` + `touchmove` (passive: false) update the ghost position and hit-test `[data-dropzone]` via `elementFromPoint`.
 - `mouseup` + `touchend` commit the dragged item to the targeted meal slot.
-- `touchmove` calls `e.preventDefault()` to block page scroll during a drag.
+- `touchmove` calls `e.preventDefault()` only once a drag is active.
+- **Phones also get tap-to-add:** each inventory row shows 🌅/☀️/🌙 buttons (`md:hidden`) that call `addToMeal(meal, item)`. The button group stops `mousedown`/`touchstart` propagation so a tap never seeds a drag.
 
 ## Vite Proxy Configuration
 
@@ -86,11 +100,19 @@ proxy: {
 
 ## Favicon / App Icon
 
-`frontend/public/favicon.svg` — orange circle background, black frying pan, fried egg (white + amber yolk). Shown in browser tabs, bookmarks, and iOS home screen saves.
+`frontend/public/favicon.svg` — orange circle background, black frying pan, fried egg (white + amber yolk). Shown in browser tabs and bookmarks.
+
+PNG versions of the same icon, rendered from the SVG, are used for installing the app:
+| File | Size | Used by |
+|---|---|---|
+| `apple-touch-icon.png` | 180×180 | iOS home screen (iOS ignores SVG touch icons) |
+| `icon-192.png` / `icon-512.png` | 192 / 512 | `manifest.json` icons — Android install prompt + splash screen |
+
+`index.html` also has the iOS standalone meta tags (`apple-mobile-web-app-capable`, `-status-bar-style`, `-title`) and `viewport-fit=cover`. `manifest.json` has `id`, `scope`, `orientation: portrait`.
 
 **How it works end-to-end (Docker):**
 - Vite copies everything in `frontend/public/` into `dist/` at build time — no Dockerfile change needed.
-- `index.html` references it via `<link rel="icon" type="image/svg+xml" href="/favicon.svg">` and `<link rel="apple-touch-icon" href="/favicon.svg">`.
+- `index.html` references it via `<link rel="icon" type="image/svg+xml" href="/favicon.svg">`; `<link rel="apple-touch-icon">` points to `/apple-touch-icon.png`.
 - In production (single container), `backend/main.py`'s SPA catch-all route checks whether the requested path is a real file in `frontend_dist/` before falling back to `index.html`. This prevents `/favicon.svg` from being swallowed by the catch-all and returning the SPA shell instead of the icon.
 
 **`main.py` root-file serving logic (inside the `SERVE_STATIC` block):**
@@ -112,7 +134,8 @@ The `candidate.parent == _frontend_dist` guard ensures only files directly in `d
 | `anthropic` missing | `backend/requirements.txt` | Add `anthropic>=0.40.0` |
 | `/ai-insights/mcp` missing | `backend/routers/ai_insights.py` | Add POST route |
 | `AIInsightsPanel` import | `frontend/src/components/AIInsightsPanel/AIInsightsPanel.jsx` | Fix import to `../../api/index.js` |
-| PWA service worker missing | `frontend/` | Install `vite-plugin-pwa`, configure service worker (manifest.json + share target already present) |
+| PWA service worker missing | `frontend/` | Install `vite-plugin-pwa`, configure service worker (manifest.json + PNG icons + share target already present) |
+| Local venv broken | `backend/venv/` | `pyvenv.cfg` points at a Python install from another machine — recreate with `python -m venv backend\venv` + `pip install -r backend/requirements.txt` |
 
 ## Project Structure
 
@@ -430,9 +453,9 @@ Theme state is managed by `ThemeContext` (`frontend/src/context/ThemeContext.jsx
 
 HTML5 drag API is broken inside `overflow: auto/scroll` ancestors (Chrome/Safari — `dataTransfer.getData()` returns empty string). The drag system uses pointer events (mouse + touch) instead:
 
-- `onMouseDown` / `onTouchStart` on inventory row items seeds `pendingRef` with the item and start coordinates
+- `onMouseDown` / `onTouchStart` on inventory row items seeds `pendingRef` with the item and start coordinates (touch sets `touch: true` and starts the 300 ms long-press timer — see Responsive Design above)
 - Single `useEffect([], [])` adds document-level `mousemove`+`mouseup` and `touchmove`+`touchend` listeners; refs (`draggingRef`, `activeRef`) provide stale-closure-free access to state
-- `handleMove(cx, cy)` shared by both mouse and touch paths: activates drag after 4px threshold; updates floating ghost; hides ghost → `elementFromPoint` → find `[data-dropzone]` ancestor → set `activeOver`
+- `handleMove(cx, cy)` shared by both mouse and touch paths: activates a mouse drag after 4px threshold (touch drags start from the long-press timer instead); updates floating ghost; hides ghost → `elementFromPoint` → find `[data-dropzone]` ancestor → set `activeOver`
 - `touchmove` registered with `{ passive: false }` so `e.preventDefault()` can suppress page scroll during a drag
 - `handleUp()` shared by `mouseup` and `touchend`: reads refs, commits item to targeted meal slot, resets all state
 - Drop targets: `<div data-dropzone={mealName}>` — highlights when `activeOver === mealName`
@@ -696,7 +719,7 @@ If `npm install` fails with `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`, run with `--str
 ## Next Steps
 
 - **Phase 6 (AI):** Mount MCP server in `main.py`; fix `get_db()` in `mcp/server.py`; implement Claude LLM call in `claude_client.py`; add `/ai-insights/mcp` route; fix `AIInsightsPanel` import
-- **Phase 7 (PWA):** Install `vite-plugin-pwa`; configure service worker for offline support and home-screen install (manifest.json already present with share target)
+- **Phase 7 (PWA):** Install `vite-plugin-pwa`; configure a service worker for offline support. The manifest, PNG icons and iOS meta tags are already done. Serve over **HTTPS** (e.g. a reverse proxy in front of port 8007) — Android only offers a real "Install app" and the share target over HTTPS.
 - **Phase 8 (Nutrition charts):** Implement nutrient intake pie charts by month using tags + nutrition data from inventory items linked to meal preps
 
 ## Recipes Feature
