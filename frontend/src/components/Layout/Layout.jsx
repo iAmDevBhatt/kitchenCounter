@@ -90,8 +90,11 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* Extra bottom padding on phones so content clears the fixed tab bar */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 md:pt-6 pb-28 md:pb-6 relative z-10">
+      {/* Extra bottom padding on phones so content clears the fixed tab bar.
+          No z-index here: it would create a stacking context and trap modals
+          (z-50) underneath the header and bottom nav (z-40). DOM order already
+          paints main above the wallpaper overlay. */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 md:pt-6 pb-28 md:pb-6 relative">
         {children}
       </main>
 

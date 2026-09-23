@@ -9,6 +9,7 @@ A Progressive Web App for managing your kitchen inventory, planning meals, and s
 ### Inventory Management
 - Track items with name, category, quantity, status, expiry date, net weight, and nutritional info (carbs, protein, fat, fiber, sugar)
 - Upload a photo per item — thumbnails shown in all tables; camera capture supported on mobile/tablet
+- Click / tap any item thumbnail to see the full-size photo (tap outside, ✕ or Esc to close)
 - Attach tags (vitamin, mineral, allergen, diet, general) for nutritional analysis
 - Bulk import/export via `.xlsx` or `.csv` (SheetJS + PapaParse)
 - Filter by status: All Items · Currently In Stock · Running Low · Out of Stock

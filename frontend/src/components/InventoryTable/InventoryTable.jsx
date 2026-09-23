@@ -593,21 +593,73 @@ function buildCatTree(flat) {
 }
 
 // ── Item thumbnail ────────────────────────────────────────────────────────────
-function ItemThumb({ path, name }) {
+// Clicking a thumbnail that has an image opens the full-size preview.
+function ItemThumb({ path, name, onPreview, size = 'w-9 h-9' }) {
   const url = imgUrl(path)
   if (!url) {
     return (
-      <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0 text-orange-400 text-sm font-bold select-none">
+      <div className={`${size} rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0 text-orange-400 text-sm font-bold select-none`}>
         {name?.[0]?.toUpperCase() || '?'}
       </div>
     )
   }
   return (
-    <img
-      src={url}
-      alt={name}
-      className="w-9 h-9 rounded-lg object-cover flex-shrink-0 border border-orange-100"
-    />
+    <button
+      type="button"
+      onClick={() => onPreview?.({ url, name })}
+      title="View image"
+      aria-label={`View image of ${name}`}
+      className="flex-shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 cursor-zoom-in"
+    >
+      <img
+        src={url}
+        alt={name}
+        className={`${size} rounded-lg object-cover border border-orange-100 hover:opacity-90 transition-opacity`}
+      />
+    </button>
+  )
+}
+
+// ── Full-size image preview (lightbox) ────────────────────────────────────────
+// Tap/click the backdrop, the ✕ button, or press Esc to close.
+function ImagePreview({ image, onClose }) {
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    // Stop the page behind from scrolling while the preview is open
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/85 p-3 sm:p-8"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={image.name}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close preview"
+        className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-full bg-white/15 text-white text-xl hover:bg-white/25 transition-colors"
+        style={{ marginTop: 'env(safe-area-inset-top)' }}
+      >
+        ✕
+      </button>
+      <img
+        src={image.url}
+        alt={image.name}
+        onClick={e => e.stopPropagation()}
+        className="max-w-full max-h-[80dvh] sm:max-h-[85vh] object-contain rounded-xl shadow-2xl bg-white/5"
+      />
+      <p className="mt-3 text-white text-sm font-medium text-center break-words max-w-full px-4">{image.name}</p>
+    </div>
   )
 }
 
@@ -627,6 +679,7 @@ export default function InventoryTable({ statusFilter, showAllFilters, onStatsCh
   const [error,      setError]      = useState(null)
   const [editItem,   setEditItem]   = useState(null)
   const [deleteItem, setDeleteItem] = useState(null)
+  const [previewImg, setPreviewImg] = useState(null)   // { url, name } for the image lightbox
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -812,7 +865,7 @@ export default function InventoryTable({ statusFilter, showAllFilters, onStatsCh
           return (
             <li key={item.id} className="rounded-xl border border-stone-200 bg-white p-3">
               <div className="flex items-start gap-3">
-                <ItemThumb path={item.item_image_path} name={item.item_name} />
+                <ItemThumb path={item.item_image_path} name={item.item_name} onPreview={setPreviewImg} size="w-12 h-12" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-medium text-stone-800 break-words min-w-0">{item.item_name}</p>
@@ -877,7 +930,7 @@ export default function InventoryTable({ statusFilter, showAllFilters, onStatsCh
                 <tr key={item.id} className="hover:bg-orange-50/40 transition-colors">
                   <td className="td">
                     <div className="flex items-center gap-2.5">
-                      <ItemThumb path={item.item_image_path} name={item.item_name} />
+                      <ItemThumb path={item.item_image_path} name={item.item_name} onPreview={setPreviewImg} />
                       <div className="min-w-0">
                         <p className="font-medium text-stone-800 truncate">{item.item_name}</p>
                         {item._tags?.length > 0 && (
@@ -943,6 +996,10 @@ export default function InventoryTable({ statusFilter, showAllFilters, onStatsCh
 
       {editItem && (
         <ItemModal item={editItem} categories={categories} locations={locations} onSave={handleSave} onClose={() => setEditItem(null)} />
+      )}
+
+      {previewImg && (
+        <ImagePreview image={previewImg} onClose={() => setPreviewImg(null)} />
       )}
 
       {deleteItem && (

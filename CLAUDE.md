@@ -55,6 +55,7 @@ The app is fully responsive — designed and tested for laptop, tablet, and phon
 | Scrollable tab strip | `.tab-bar` in `index.css` | One swipeable row on phones, wraps from `sm`. Used on Inventory + Configuration. |
 | 16px form fields | `index.css` base layer | Below 640px every input/select/textarea is forced to 16px — iOS Safari zooms the page on focus when a field is smaller. |
 | Safe areas | `viewport-fit=cover` + `.pb-safe` utility | Bottom nav, sheets and the DayDetail slide-over pad for the iPhone home indicator. |
+| No z-index on `<main>` | `Layout.jsx` | `main` is `relative` with **no** z-index. A z-index there creates a stacking context that traps every page modal (z-50) below the header and bottom nav (z-40), so the tab bar would cover the sheet footers. Don't add one back. |
 
 ### Touch Targets
 - The `.btn` base class in `index.css` enforces `min-h-[44px]` on all buttons, meeting touch-target accessibility guidelines.
@@ -522,7 +523,8 @@ Also fixed: `YEARS` array now covers `now.getFullYear() - 10` through present (w
 2. On save: item is created/updated first → ID obtained → `POST /inventory/upload-image/{id}` with multipart form data
 3. Backend saves to `backend/static/uploads/{uuid}{ext}`, stores relative path in `item_image_path`
 4. Frontend resolves path: `/static` + path → served by Vite proxy → backend `/static` mount
-5. Tables display 36×36 `object-cover` thumbnail; items without image show an initial-letter fallback
+5. Tables display 36×36 `object-cover` thumbnail (48×48 on the phone card list); items without image show an initial-letter fallback
+6. **Image preview:** clicking/tapping a thumbnail (`ItemThumb` → `onPreview`) opens `ImagePreview`, a full-screen lightbox in `InventoryTable.jsx` (`z-[60]`, `object-contain`, max `80dvh` on phones / `85vh` from `sm`). It closes on backdrop tap, the ✕ button or Esc, and locks body scroll while open. Works the same on laptop, tablet and phone.
 
 ## Docker Deployment
 

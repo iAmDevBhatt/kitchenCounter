@@ -105,6 +105,8 @@
   - `RecipesPage`: phone card list; action buttons pulled into `renderActions(r)` (44px tap targets on phones); modals are bottom sheets.
   - `UserManagement`: Email/Joined columns hidden on phones (email shown under the username). `ConfigurationPage`/`InventoryPage` tabs use `.tab-bar`.
   - Fixed double-encoded characters (`Addingâ€¦` → `Adding…`) in `TagManager`, `UserManagement`, `StorageLocationManager`.
+  - `InventoryTable`: **image preview** — clicking/tapping an item thumbnail opens a full-screen `ImagePreview` lightbox (Esc / ✕ / backdrop to close; body scroll locked), on laptop, tablet and phone.
+  - `Layout.jsx`: removed `z-10` from `<main>` — it trapped all modals under the sticky header / bottom nav (header wasn't dimmed; on phones the tab bar covered the bottom-sheet buttons).
   - PWA: added `apple-touch-icon.png` (180), `icon-192.png`, `icon-512.png`; manifest gets PNG icons + `id`/`scope`/`orientation`; `index.html` gets iOS standalone meta tags + `viewport-fit=cover`.
 
 ### ⚠️ Deviations from spec / known issues
